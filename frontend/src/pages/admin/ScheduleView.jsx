@@ -3,23 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, RefreshCw, Plus,
   Phone, MapPin, IndianRupee, User, Clock,
-  PlayCircle, CheckCircle2, AlertTriangle, Timer, XCircle,
-  CalendarCheck, MessageSquare, Send, Smartphone,
+  PlayCircle, CheckCircle2, AlertTriangle, Timer,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminLayout from '../../components/AdminLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { bookingsAPI, staffAPI } from '../../utils/api';
+import { bookingsAPI } from '../../utils/api';
 import { formatCurrency } from '../../utils/helpers';
 
-const TIME_SLOTS = [
-  '08:00 AM - 10:00 AM',
-  '10:00 AM - 12:00 PM',
-  '12:00 PM - 02:00 PM',
-  '02:00 PM - 04:00 PM',
-  '04:00 PM - 06:00 PM',
-  '06:00 PM - 08:00 PM',
-];
+// Parse a slot string like "07:30 AM - 08:30 AM" → minutes since midnight for start or end
+function parseSlotMins(slot, which = 'start') {
+  if (!slot) return -1;
+  const parts = slot.split(' - ');
+  const part = (which === 'start' ? parts[0] : parts[1])?.trim();
+  if (!part) return -1;
+  const [timePart, period] = part.split(' ');
+  let [h, m] = timePart.split(':').map(Number);
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  return h * 60 + (m || 0);
+}
 
 const STATUS_COLORS = {
   pending:     'bg-yellow-100 border-yellow-300 text-yellow-800',
@@ -54,11 +57,6 @@ export default function ScheduleView() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [clockAction, setClockAction] = useState(null); // 'in' | 'out'
   const [overtimeAlerts, setOvertimeAlerts] = useState([]);
-  const [sendingSchedule, setSendingSchedule] = useState(new Set());
-  const [resendingJob, setResendingJob] = useState(false);
-  const [pingModal, setPingModal] = useState(null); // { worker, booking? }
-  const [pingMessage, setPingMessage] = useState('');
-  const [sendingPing, setSendingPing] = useState(false);
   const alertIntervalRef = useRef(null);
   const isToday = selectedDate === toDateStr(new Date());
 
@@ -99,22 +97,32 @@ export default function ScheduleView() {
   const nextDay = () => { const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(toDateStr(d)); };
   const goToday = () => setSelectedDate(toDateStr(new Date()));
 
-  // Build grid: slot → staffId → booking
+  // Build grid dynamically from today's bookings (any custom time slot)
   const buildGrid = () => {
-    if (!schedule) return {};
+    if (!schedule) return { slots: [], grid: {} };
     const { bookings, staff } = schedule;
+
+    // Collect unique slots, sort chronologically by start time
+    const slotSet = new Set();
+    bookings.forEach((b) => { if (b.timeSlot) slotSet.add(b.timeSlot); });
+    const slots = [...slotSet].sort((a, b) => parseSlotMins(a) - parseSlotMins(b));
+
     const grid = {};
-    TIME_SLOTS.forEach((slot) => {
+    slots.forEach((slot) => {
       grid[slot] = { unassigned: [] };
       staff.forEach((s) => { grid[slot][s._id] = null; });
     });
     bookings.forEach((b) => {
       const slot = b.timeSlot;
-      if (!grid[slot]) return;
+      if (!slot) return;
+      if (!grid[slot]) {
+        grid[slot] = { unassigned: [] };
+        staff.forEach((s) => { grid[slot][s._id] = null; });
+      }
       if (b.assignedStaff?._id) grid[slot][b.assignedStaff._id] = b;
       else grid[slot].unassigned.push(b);
     });
-    return grid;
+    return { slots, grid };
   };
 
   const updateStatus = async (bookingId, status) => {
@@ -184,73 +192,7 @@ export default function ScheduleView() {
     }
   };
 
-  const handleResendJobDetails = async (booking) => {
-    setResendingJob(true);
-    try {
-      const res = await bookingsAPI.resendWorkerMessage(booking._id);
-      const { sent, message } = res.data;
-      if (sent) {
-        toast.success(`Full job details sent to ${booking.assignedStaff?.name} on WhatsApp`);
-      } else {
-        toast(message, { icon: '⚠️', duration: 5000 });
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send');
-    } finally {
-      setResendingJob(false);
-    }
-  };
-
-  const handleSendSchedule = async (worker) => {
-    setSendingSchedule((prev) => new Set(prev).add(worker._id));
-    try {
-      const res = await staffAPI.notifySchedule(worker._id, selectedDate);
-      const { sent, message, jobCount } = res.data;
-      if (sent) {
-        toast.success(`Schedule sent to ${worker.name} (${jobCount} job${jobCount !== 1 ? 's' : ''})`);
-      } else {
-        toast(message, { icon: '⚠️', duration: 5000 });
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || `Failed to send to ${worker.name}`);
-    } finally {
-      setSendingSchedule((prev) => { const s = new Set(prev); s.delete(worker._id); return s; });
-    }
-  };
-
-  const handleSendAllSchedules = async () => {
-    const workers = schedule?.staff || [];
-    if (!workers.length) return;
-    toast('Sending schedules to all workers…', { icon: '📤' });
-    await Promise.allSettled(workers.map((w) => handleSendSchedule(w)));
-  };
-
-  const openPingModal = (worker, booking = null) => {
-    setPingMessage('');
-    setPingModal({ worker, booking });
-  };
-
-  const handleSendPing = async () => {
-    if (!pingMessage.trim() || !pingModal) return;
-    setSendingPing(true);
-    try {
-      const res = await staffAPI.notify(pingModal.worker._id, pingMessage.trim(), pingModal.booking?._id);
-      const { sent, message } = res.data;
-      if (sent) {
-        toast.success(`Message sent to ${pingModal.worker.name}`);
-      } else {
-        toast(message, { icon: '⚠️', duration: 5000 });
-      }
-      setPingModal(null);
-      setPingMessage('');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send message');
-    } finally {
-      setSendingPing(false);
-    }
-  };
-
-  const grid = buildGrid();
+  const { slots: timeSlots, grid } = buildGrid();
   const staff = schedule?.staff || [];
   const totalBookings = schedule?.bookings?.length || 0;
   const statusCounts = (schedule?.bookings || []).reduce((acc, b) => {
@@ -329,15 +271,6 @@ export default function ScheduleView() {
             <button onClick={() => { fetchSchedule(); fetchOvertimeAlerts(); }} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
               <RefreshCw className="w-4 h-4 text-gray-500" />
             </button>
-            {staff.length > 0 && (
-              <button
-                onClick={handleSendAllSchedules}
-                title="Send today's schedule to all workers"
-                className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 font-medium"
-              >
-                <CalendarCheck className="w-4 h-4" /> Send All Schedules
-              </button>
-            )}
             <button onClick={() => navigate('/admin/new-booking')} className="btn-primary gap-1.5 text-sm">
               <Plus className="w-4 h-4" /> New Booking
             </button>
@@ -376,74 +309,72 @@ export default function ScheduleView() {
                   <div key={s._id} className="bg-gray-800 text-white text-xs px-3 py-3">
                     <div className="font-semibold">{s.name}</div>
                     <div className="text-gray-400 mt-0.5">{s.phone}</div>
-                    <div className="flex gap-1 mt-1.5">
-                      <button
-                        onClick={() => handleSendSchedule(s)}
-                        disabled={sendingSchedule.has(s._id)}
-                        title="Send day schedule via WhatsApp"
-                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-700 hover:bg-green-600 text-white text-[10px] disabled:opacity-50"
-                      >
-                        {sendingSchedule.has(s._id) ? '…' : <><CalendarCheck className="w-2.5 h-2.5" /> Schedule</>}
-                      </button>
-                      <button
-                        onClick={() => openPingModal(s)}
-                        title="Send custom message via WhatsApp"
-                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-700 hover:bg-blue-600 text-white text-[10px]"
-                      >
-                        <MessageSquare className="w-2.5 h-2.5" /> Ping
-                      </button>
-                    </div>
                   </div>
                 ))}
                 <div className="bg-gray-700 text-gray-300 text-xs font-semibold px-3 py-3">Unassigned</div>
               </div>
 
-              {/* Rows */}
-              <div className="border border-gray-200 border-t-0 rounded-b-xl overflow-hidden divide-y divide-gray-100">
-                {TIME_SLOTS.map((slot, i) => {
-                  const active = isToday && isCurrentTimeSlot(slot);
-                  return (
-                    <div
-                      key={slot}
-                      className={`grid gap-px ${active ? 'bg-primary-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
-                      style={{ gridTemplateColumns: `140px repeat(${staff.length + 1}, 1fr)` }}
+              {/* Rows — built from actual bookings (any custom time slot) */}
+              {timeSlots.length === 0 ? (
+                <div className="border border-gray-200 border-t-0 rounded-b-xl overflow-hidden bg-white">
+                  <div className="flex flex-col items-center justify-center py-14 text-gray-400 gap-3">
+                    <Clock className="w-8 h-8 text-gray-200" />
+                    <p className="text-sm">No bookings yet for this day.</p>
+                    <button
+                      onClick={() => navigate(`/admin/new-booking?date=${selectedDate}`)}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 font-medium"
                     >
-                      <div className={`px-3 py-3 text-xs font-medium flex flex-col justify-center ${active ? 'text-primary-700' : 'text-gray-600'}`}>
-                        {slot.split(' - ').map((t, j) => <span key={j}>{t}</span>)}
-                        {active && <span className="text-primary-500 font-bold text-[10px] mt-0.5">▶ NOW</span>}
-                      </div>
-                      {staff.map((s) => {
-                        const booking = grid[slot]?.[s._id];
-                        return (
-                          <div key={s._id} className="p-1.5 min-h-[72px]">
-                            {booking ? (
-                              <BookingCard booking={booking} onClick={() => setSelectedBooking(booking)} />
-                            ) : (
-                              <div
-                                className="h-full min-h-[60px] border-2 border-dashed border-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
-                                onClick={() => navigate(`/admin/new-booking?date=${selectedDate}&slot=${encodeURIComponent(slot)}&worker=${s._id}`)}
-                              >
-                                <Plus className="w-4 h-4 text-gray-200 group-hover:text-primary-400" />
-                              </div>
-                            )}
+                      <Plus className="w-4 h-4" /> Add First Booking
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border border-gray-200 border-t-0 rounded-b-xl overflow-hidden divide-y divide-gray-100">
+                  {timeSlots.map((slot, i) => {
+                    const active = isToday && isCurrentTimeSlot(slot);
+                    return (
+                      <div
+                        key={slot}
+                        className={`grid gap-px ${active ? 'bg-primary-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                        style={{ gridTemplateColumns: `140px repeat(${staff.length + 1}, 1fr)` }}
+                      >
+                        <div className={`px-3 py-3 text-xs font-medium flex flex-col justify-center ${active ? 'text-primary-700' : 'text-gray-600'}`}>
+                          {slot.split(' - ').map((t, j) => <span key={j}>{t}</span>)}
+                          {active && <span className="text-primary-500 font-bold text-[10px] mt-0.5">▶ NOW</span>}
+                        </div>
+                        {staff.map((s) => {
+                          const booking = grid[slot]?.[s._id];
+                          return (
+                            <div key={s._id} className="p-1.5 min-h-[72px]">
+                              {booking ? (
+                                <BookingCard booking={booking} onClick={() => setSelectedBooking(booking)} />
+                              ) : (
+                                <div
+                                  className="h-full min-h-[60px] border-2 border-dashed border-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
+                                  onClick={() => navigate(`/admin/new-booking?date=${selectedDate}&slot=${encodeURIComponent(slot)}`)}
+                                >
+                                  <Plus className="w-4 h-4 text-gray-200 group-hover:text-primary-400" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div className="p-1.5 min-h-[72px] space-y-1">
+                          {(grid[slot]?.unassigned || []).map((b) => (
+                            <BookingCard key={b._id} booking={b} onClick={() => setSelectedBooking(b)} />
+                          ))}
+                          <div
+                            className="border-2 border-dashed border-gray-100 rounded-lg flex items-center justify-center py-2 cursor-pointer hover:border-primary-200 hover:bg-primary-50/30 group"
+                            onClick={() => navigate(`/admin/new-booking?date=${selectedDate}&slot=${encodeURIComponent(slot)}`)}
+                          >
+                            <Plus className="w-3 h-3 text-gray-200 group-hover:text-primary-400" />
                           </div>
-                        );
-                      })}
-                      <div className="p-1.5 min-h-[72px] space-y-1">
-                        {(grid[slot]?.unassigned || []).map((b) => (
-                          <BookingCard key={b._id} booking={b} onClick={() => setSelectedBooking(b)} />
-                        ))}
-                        <div
-                          className="border-2 border-dashed border-gray-100 rounded-lg flex items-center justify-center py-2 cursor-pointer hover:border-primary-200 hover:bg-primary-50/30 group"
-                          onClick={() => navigate(`/admin/new-booking?date=${selectedDate}&slot=${encodeURIComponent(slot)}`)}
-                        >
-                          <Plus className="w-3 h-3 text-gray-200 group-hover:text-primary-400" />
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -599,35 +530,10 @@ export default function ScheduleView() {
 
               {/* Worker */}
               {selectedBooking.assignedStaff && (
-                <div className="bg-blue-50 rounded-xl p-3 space-y-2">
-                  <div className="text-xs text-blue-500 font-medium">Assigned Worker</div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <div className="font-semibold text-blue-900">{selectedBooking.assignedStaff.name}</div>
-                      <div className="text-blue-700 text-sm">{selectedBooking.assignedStaff.phone}</div>
-                    </div>
-                    <button
-                      onClick={() => openPingModal(selectedBooking.assignedStaff, selectedBooking)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shrink-0"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" /> Message
-                    </button>
-                  </div>
-
-                  {/* Send full job briefing */}
-                  <button
-                    onClick={() => handleResendJobDetails(selectedBooking)}
-                    disabled={resendingJob || selectedBooking.status === 'cancelled'}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-colors disabled:opacity-50"
-                  >
-                    {resendingJob
-                      ? <><LoadingSpinner size="sm" /> Sending…</>
-                      : <><Smartphone className="w-3.5 h-3.5" /> Send Full Job Details to Worker</>
-                    }
-                  </button>
-                  <p className="text-[10px] text-blue-400 text-center">
-                    Sends customer, address, service, amount, notes to worker's WhatsApp
-                  </p>
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <div className="text-xs text-blue-500 font-medium mb-1.5">Assigned Worker</div>
+                  <div className="font-semibold text-blue-900">{selectedBooking.assignedStaff.name}</div>
+                  <div className="text-blue-700 text-sm">{selectedBooking.assignedStaff.phone}</div>
                 </div>
               )}
 
@@ -674,55 +580,6 @@ export default function ScheduleView() {
           </div>
         </div>
       )}
-      {/* ── Manual Ping Modal ── */}
-      {pingModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPingModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-gray-900">Message Worker</h3>
-                <p className="text-sm text-gray-500">→ {pingModal.worker.name}</p>
-              </div>
-              <button onClick={() => setPingModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">✕</button>
-            </div>
-
-            {pingModal.booking && (
-              <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
-                Re: <span className="font-semibold">{pingModal.booking.bookingId}</span>
-                {' · '}{pingModal.booking.serviceLabel}
-                {' · '}{pingModal.booking.timeSlot}
-              </div>
-            )}
-
-            <textarea
-              autoFocus
-              rows={4}
-              className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none resize-none"
-              placeholder="Type your message to the worker…"
-              value={pingMessage}
-              onChange={(e) => setPingMessage(e.target.value)}
-            />
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPingModal(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSendPing}
-                disabled={!pingMessage.trim() || sendingPing}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold disabled:opacity-50"
-              >
-                {sendingPing ? <LoadingSpinner size="sm" /> : <Send className="w-4 h-4" />}
-                Send WhatsApp
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </AdminLayout>
   );
 }
@@ -758,21 +615,16 @@ function BookingCard({ booking, onClick }) {
 
 function isCurrentTimeSlot(slot) {
   const now = new Date();
-  const hour = now.getHours();
-  const startHour = parseInt(slot.split(':')[0]);
-  const isPM = slot.includes('PM') && !slot.startsWith('12');
-  const start24 = isPM ? startHour + 12 : startHour;
-  return hour >= start24 && hour < start24 + 2;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const startMin = parseSlotMins(slot, 'start');
+  const endMin   = parseSlotMins(slot, 'end');
+  return startMin >= 0 && endMin > 0 && nowMin >= startMin && nowMin < endMin;
 }
 
 function isRunningOvertime(slot) {
   if (!slot) return false;
   const now = new Date();
-  const parts = slot.split(' - ');
-  const endPart = parts[1]?.trim();
-  if (!endPart) return false;
-  const [time, period] = endPart.split(' ');
-  let endHour = parseInt(time.split(':')[0]);
-  if (period === 'PM' && endHour !== 12) endHour += 12;
-  return now.getHours() >= endHour;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const endMin  = parseSlotMins(slot, 'end');
+  return endMin > 0 && nowMin >= endMin;
 }

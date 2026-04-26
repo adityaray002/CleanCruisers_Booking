@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Phone, User, MapPin, Calendar, Clock, IndianRupee,
   FileText, CheckCircle, AlertTriangle, Search, Loader2,
@@ -11,14 +11,46 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import { bookingsAPI, staffAPI } from '../../utils/api';
 import { formatCurrency, formatDate, INDIAN_STATES } from '../../utils/helpers';
 
-const TIME_SLOTS = [
-  '08:00 AM - 10:00 AM',
-  '10:00 AM - 12:00 PM',
-  '12:00 PM - 02:00 PM',
-  '02:00 PM - 04:00 PM',
-  '04:00 PM - 06:00 PM',
-  '06:00 PM - 08:00 PM',
+// Quick 1-hour preset slots the admin can tap to auto-fill the time pickers
+const PRESETS = [
+  { label: '7–8 AM',   start: '07:00', end: '08:00' },
+  { label: '8–9 AM',   start: '08:00', end: '09:00' },
+  { label: '9–10 AM',  start: '09:00', end: '10:00' },
+  { label: '10–11 AM', start: '10:00', end: '11:00' },
+  { label: '11–12 PM', start: '11:00', end: '12:00' },
+  { label: '12–1 PM',  start: '12:00', end: '13:00' },
+  { label: '1–2 PM',   start: '13:00', end: '14:00' },
+  { label: '2–3 PM',   start: '14:00', end: '15:00' },
+  { label: '3–4 PM',   start: '15:00', end: '16:00' },
+  { label: '4–5 PM',   start: '16:00', end: '17:00' },
+  { label: '5–6 PM',   start: '17:00', end: '18:00' },
+  { label: '6–7 PM',   start: '18:00', end: '19:00' },
+  { label: '7–8 PM',   start: '19:00', end: '20:00' },
 ];
+
+// 24h "HH:MM"  →  "HH:MM AM/PM"
+const to12h = (t) => {
+  if (!t) return '';
+  const [hStr, mStr] = t.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const period = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${String(h).padStart(2, '0')}:${m} ${period}`;
+};
+
+// "HH:MM AM/PM"  →  24h "HH:MM"
+const to24h = (t12) => {
+  if (!t12) return '';
+  const parts = t12.trim().split(' ');
+  const period = parts[1];
+  const [hStr, mStr] = parts[0].split(':');
+  let h = parseInt(hStr, 10);
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${mStr}`;
+};
 
 const SOURCE_OPTIONS = [
   { id: 'phone', label: 'Phone Call', icon: PhoneCall },
@@ -41,9 +73,12 @@ const EMPTY = {
 
 export default function NewBooking() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const phoneRef = useRef();
 
   const [form, setForm] = useState({ ...EMPTY });
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime]     = useState('');
   const [staffSlots, setStaffSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -51,8 +86,27 @@ export default function NewBooking() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Auto-focus phone on mount
-  useEffect(() => { phoneRef.current?.focus(); }, []);
+  // Auto-focus phone; pre-fill from URL params (date + slot passed by ScheduleView's + button)
+  useEffect(() => {
+    phoneRef.current?.focus();
+    const dateParam = searchParams.get('date');
+    const slotParam = searchParams.get('slot');
+    if (dateParam) setForm((f) => ({ ...f, scheduledDate: dateParam }));
+    if (slotParam) {
+      const parts = slotParam.split(' - ');
+      if (parts.length === 2) {
+        setStartTime(to24h(parts[0].trim()));
+        setEndTime(to24h(parts[1].trim()));
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Whenever start/end times change → rebuild the timeSlot string
+  useEffect(() => {
+    const newSlot = startTime && endTime ? `${to12h(startTime)} - ${to12h(endTime)}` : '';
+    setForm((f) => ({ ...f, timeSlot: newSlot, assignedStaffId: '' }));
+    setErrors((e) => ({ ...e, timeSlot: undefined }));
+  }, [startTime, endTime]);
 
   // Fetch staff availability whenever date + timeSlot change
   useEffect(() => {
@@ -333,7 +387,7 @@ export default function NewBooking() {
             <Calendar className="w-4 h-4 text-primary-600" /> Schedule & Worker
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="label">Date *</label>
               <input
@@ -342,20 +396,62 @@ export default function NewBooking() {
                 value={form.scheduledDate}
                 min={todayStr}
                 max={maxDateStr}
-                onChange={(e) => { set('scheduledDate', e.target.value); set('timeSlot', ''); set('assignedStaffId', ''); }}
+                onChange={(e) => { set('scheduledDate', e.target.value); setStartTime(''); setEndTime(''); }}
               />
               {errors.scheduledDate && <p className="text-red-500 text-xs mt-1">{errors.scheduledDate}</p>}
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label className="label">Time Slot *</label>
-              <select
-                className={`input-field ${errors.timeSlot ? 'input-error' : ''}`}
-                value={form.timeSlot}
-                onChange={(e) => { set('timeSlot', e.target.value); set('assignedStaffId', ''); }}
-              >
-                <option value="">Select a time slot</option>
-                {TIME_SLOTS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+
+              {/* Quick presets — tap to fill the pickers */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {PRESETS.map((p) => {
+                  const isActive = startTime === p.start && endTime === p.end;
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => { setStartTime(p.start); setEndTime(p.end); }}
+                      className={`px-2.5 py-1 text-xs rounded-lg border transition-all
+                        ${isActive
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400 hover:bg-primary-50'
+                        }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom time pickers */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <input
+                    type="time"
+                    className={`input-field ${errors.timeSlot && !startTime ? 'input-error' : ''}`}
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5 pl-1">Start time</p>
+                </div>
+                <span className="text-gray-400 text-sm pb-4">→</span>
+                <div className="flex-1">
+                  <input
+                    type="time"
+                    className={`input-field ${errors.timeSlot && !endTime ? 'input-error' : ''}`}
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5 pl-1">End time</p>
+                </div>
+              </div>
+
+              {form.timeSlot && (
+                <p className="text-xs text-primary-600 font-medium mt-1.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Slot: {form.timeSlot}
+                </p>
+              )}
               {errors.timeSlot && <p className="text-red-500 text-xs mt-1">{errors.timeSlot}</p>}
             </div>
           </div>

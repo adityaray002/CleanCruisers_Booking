@@ -200,11 +200,6 @@ export default function StaffManagement() {
                     <span className="truncate">{member.email}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                    💬 WhatsApp Enabled
-                  </span>
-                </div>
               </div>
 
               {/* Specializations */}
@@ -338,17 +333,6 @@ export default function StaffManagement() {
                       </button>
                     );
                   })}
-                </div>
-              </div>
-
-              {/* WhatsApp info */}
-              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex items-start gap-3">
-                <span className="text-2xl mt-0.5">💬</span>
-                <div>
-                  <div className="font-semibold text-green-800 text-sm">WhatsApp notifications are automatic</div>
-                  <div className="text-xs text-green-700 mt-0.5">
-                    Once Green API is connected in your server settings, this worker will automatically receive WhatsApp messages for every new booking, update, reschedule, cancellation, and daily schedule. No setup needed on the worker's phone.
-                  </div>
                 </div>
               </div>
 

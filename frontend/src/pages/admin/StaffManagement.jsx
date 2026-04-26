@@ -200,6 +200,11 @@ export default function StaffManagement() {
                     <span className="truncate">{member.email}</span>
                   </div>
                 )}
+                <div>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                    💬 WhatsApp Enabled
+                  </span>
+                </div>
               </div>
 
               {/* Specializations */}

@@ -4,12 +4,14 @@ import {
   ChevronLeft, ChevronRight, RefreshCw, Plus,
   Phone, MapPin, IndianRupee, User, Clock,
   PlayCircle, CheckCircle2, AlertTriangle, Timer,
+  CalendarCheck, MessageSquare, Send, Smartphone,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminLayout from '../../components/AdminLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { bookingsAPI } from '../../utils/api';
 import { formatCurrency } from '../../utils/helpers';
+import { openWhatsApp, buildWorkerAssignmentMsg, buildWorkerDayScheduleMsg, buildWorkerPingMsg } from '../../utils/whatsapp';
 
 // Parse a slot string like "07:30 AM - 08:30 AM" → minutes since midnight for start or end
 function parseSlotMins(slot, which = 'start') {
@@ -57,6 +59,9 @@ export default function ScheduleView() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [clockAction, setClockAction] = useState(null); // 'in' | 'out'
   const [overtimeAlerts, setOvertimeAlerts] = useState([]);
+  const [pingModal, setPingModal] = useState(null); // { worker, booking? }
+  const [pingMessage, setPingMessage] = useState('');
+  const [sendAllModal, setSendAllModal] = useState(false);
   const alertIntervalRef = useRef(null);
   const isToday = selectedDate === toDateStr(new Date());
 
@@ -192,6 +197,45 @@ export default function ScheduleView() {
     }
   };
 
+  // Opens WhatsApp with full job details pre-filled — admin taps Send
+  const handleResendJobDetails = (booking) => {
+    const message = buildWorkerAssignmentMsg(booking);
+    openWhatsApp(booking.assignedStaff.phone, message);
+  };
+
+  // Builds worker's day schedule from today's bookings and opens WhatsApp
+  const handleSendSchedule = (worker) => {
+    const workerBookings = (schedule?.bookings || [])
+      .filter((b) =>
+        b.assignedStaff?._id?.toString() === worker._id?.toString() &&
+        b.status !== 'cancelled'
+      )
+      .sort((a, b) => parseSlotMins(a.timeSlot) - parseSlotMins(b.timeSlot));
+    const message = buildWorkerDayScheduleMsg(worker, workerBookings, selectedDate + 'T00:00:00');
+    openWhatsApp(worker.phone, message);
+  };
+
+  // Opens a modal listing all workers so admin can open WhatsApp for each one
+  const handleSendAllSchedules = () => {
+    const workers = schedule?.staff || [];
+    if (!workers.length) return;
+    setSendAllModal(true);
+  };
+
+  const openPingModal = (worker, booking = null) => {
+    setPingMessage(booking?.workerNotes || '');
+    setPingModal({ worker, booking });
+  };
+
+  // Builds ping message and opens WhatsApp — admin taps Send
+  const handleSendPing = () => {
+    if (!pingMessage.trim() || !pingModal) return;
+    const message = buildWorkerPingMsg(pingModal.worker, pingModal.booking, pingMessage.trim());
+    openWhatsApp(pingModal.worker.phone, message);
+    setPingModal(null);
+    setPingMessage('');
+  };
+
   const { slots: timeSlots, grid } = buildGrid();
   const staff = schedule?.staff || [];
   const totalBookings = schedule?.bookings?.length || 0;
@@ -271,6 +315,15 @@ export default function ScheduleView() {
             <button onClick={() => { fetchSchedule(); fetchOvertimeAlerts(); }} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50">
               <RefreshCw className="w-4 h-4 text-gray-500" />
             </button>
+            {staff.length > 0 && (
+              <button
+                onClick={handleSendAllSchedules}
+                title="Open WhatsApp for each worker with their schedule"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 font-medium"
+              >
+                <CalendarCheck className="w-4 h-4" /> Send All Schedules ↗
+              </button>
+            )}
             <button onClick={() => navigate('/admin/new-booking')} className="btn-primary gap-1.5 text-sm">
               <Plus className="w-4 h-4" /> New Booking
             </button>
@@ -309,6 +362,22 @@ export default function ScheduleView() {
                   <div key={s._id} className="bg-gray-800 text-white text-xs px-3 py-3">
                     <div className="font-semibold">{s.name}</div>
                     <div className="text-gray-400 mt-0.5">{s.phone}</div>
+                    <div className="flex gap-1 mt-1.5">
+                      <button
+                        onClick={() => handleSendSchedule(s)}
+                        title="Open WhatsApp with today's schedule pre-filled"
+                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-700 hover:bg-green-600 text-white text-[10px]"
+                      >
+                        <CalendarCheck className="w-2.5 h-2.5" /> Schedule ↗
+                      </button>
+                      <button
+                        onClick={() => openPingModal(s)}
+                        title="Open WhatsApp with custom message"
+                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-700 hover:bg-blue-600 text-white text-[10px]"
+                      >
+                        <MessageSquare className="w-2.5 h-2.5" /> Ping
+                      </button>
+                    </div>
                   </div>
                 ))}
                 <div className="bg-gray-700 text-gray-300 text-xs font-semibold px-3 py-3">Unassigned</div>
@@ -530,10 +599,30 @@ export default function ScheduleView() {
 
               {/* Worker */}
               {selectedBooking.assignedStaff && (
-                <div className="bg-blue-50 rounded-xl p-3">
-                  <div className="text-xs text-blue-500 font-medium mb-1.5">Assigned Worker</div>
-                  <div className="font-semibold text-blue-900">{selectedBooking.assignedStaff.name}</div>
-                  <div className="text-blue-700 text-sm">{selectedBooking.assignedStaff.phone}</div>
+                <div className="bg-blue-50 rounded-xl p-3 space-y-2">
+                  <div className="text-xs text-blue-500 font-medium">Assigned Worker</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-blue-900">{selectedBooking.assignedStaff.name}</div>
+                      <div className="text-blue-700 text-sm">{selectedBooking.assignedStaff.phone}</div>
+                    </div>
+                    <button
+                      onClick={() => openPingModal(selectedBooking.assignedStaff, selectedBooking)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shrink-0"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Message
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleResendJobDetails(selectedBooking)}
+                    disabled={selectedBooking.status === 'cancelled'}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" /> Open WhatsApp with Job Details ↗
+                  </button>
+                  <p className="text-[10px] text-blue-400 text-center">
+                    Opens WhatsApp pre-filled — just tap Send
+                  </p>
                 </div>
               )}
 
@@ -580,6 +669,107 @@ export default function ScheduleView() {
           </div>
         </div>
       )}
+      {/* ── Send All Schedules Modal ── */}
+      {sendAllModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSendAllModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900">Send Schedules</h3>
+                <p className="text-sm text-gray-500">Open WhatsApp for each worker</p>
+              </div>
+              <button onClick={() => setSendAllModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">✕</button>
+            </div>
+            <div className="space-y-2">
+              {(schedule?.staff || []).map((worker) => {
+                const count = (schedule?.bookings || []).filter(
+                  (b) => b.assignedStaff?._id?.toString() === worker._id?.toString() && b.status !== 'cancelled'
+                ).length;
+                return (
+                  <div key={worker._id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5">
+                    <div>
+                      <div className="font-semibold text-gray-900 text-sm">{worker.name}</div>
+                      <div className="text-xs text-gray-400">{count} job{count !== 1 ? 's' : ''} today</div>
+                    </div>
+                    <button
+                      onClick={() => handleSendSchedule(worker)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold"
+                    >
+                      <CalendarCheck className="w-3.5 h-3.5" /> Open WhatsApp ↗
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-gray-400 text-center">
+              Each button opens WhatsApp with that worker's schedule pre-filled — just tap Send.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Manual Ping Modal ── */}
+      {pingModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPingModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900">Message Worker</h3>
+                <p className="text-sm text-gray-500">→ {pingModal.worker.name}</p>
+              </div>
+              <button onClick={() => setPingModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">✕</button>
+            </div>
+
+            {pingModal.booking && (
+              <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
+                Re: <span className="font-semibold">{pingModal.booking.bookingId}</span>
+                {' · '}{pingModal.booking.serviceLabel}
+                {' · '}{pingModal.booking.timeSlot}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              {pingModal.booking && (
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-gray-500">
+                    {pingModal.booking.workerNotes ? '📋 Worker Notes (pre-filled)' : 'Message'}
+                  </label>
+                  {!pingModal.booking.workerNotes && (
+                    <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                      No worker notes on this booking
+                    </span>
+                  )}
+                </div>
+              )}
+              <textarea
+                autoFocus
+                rows={4}
+                className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none resize-none"
+                placeholder={pingModal.booking ? 'Add worker notes to the booking first, or type a message here…' : 'Type your message to the worker…'}
+                value={pingMessage}
+                onChange={(e) => setPingMessage(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPingModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendPing}
+                disabled={!pingMessage.trim()}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" /> Open WhatsApp ↗
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AdminLayout>
   );
 }

@@ -14,7 +14,7 @@ const {
   sendStaffAssignment,
 } = require('../utils/notifications');
 
-// â”€â”€â”€ PUBLIC: Customer creates booking via website â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ PUBLIC: Customer creates booking via website â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const createBooking = async (req, res, next) => {
   try {
     const {
@@ -106,7 +106,7 @@ const createBooking = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ ADMIN: Create booking via phone call â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ ADMIN: Create booking via phone call â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const adminCreateBooking = async (req, res, next) => {
   try {
     const {
@@ -132,7 +132,7 @@ const adminCreateBooking = async (req, res, next) => {
 
     const parsedPrice = Number(price) || 0;
 
-    // Worker clash check â€” atomic: check then create
+    // Worker clash check â€" atomic: check then create
     if (assignedStaffId) {
       const { startOfDay, endOfDay } = getDayRange(scheduledDate);
       const clash = await Booking.findOne({
@@ -195,7 +195,7 @@ const adminCreateBooking = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ ADMIN: Get schedule for a specific day â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ ADMIN: Get schedule for a specific day â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const getSchedule = async (req, res, next) => {
   try {
     const { date } = req.query;
@@ -220,7 +220,7 @@ const getSchedule = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ ADMIN: Look up customer history by phone â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ ADMIN: Look up customer history by phone â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const getCustomerHistory = async (req, res, next) => {
   try {
     const { phone } = req.query;
@@ -237,7 +237,7 @@ const getCustomerHistory = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ Get all bookings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Get all bookings â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const getBookings = async (req, res, next) => {
   try {
     const {
@@ -291,7 +291,7 @@ const getBookings = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ Get single booking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Get single booking â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const getBooking = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -304,7 +304,7 @@ const getBooking = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ Update booking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Update booking â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const updateBooking = async (req, res, next) => {
   try {
     const allowed = ['status', 'assignedStaff', 'adminNotes', 'workerNotes', 'scheduledDate', 'timeSlot', 'cancellationReason', 'totalAmount', 'basePrice'];
@@ -348,27 +348,33 @@ const updateBooking = async (req, res, next) => {
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
-    // â”€â”€ Decide which notifications to fire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ Decide which notifications to fire â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     const notify = async () => {
       try {
         const isRescheduled = updates.scheduledDate || updates.timeSlot;
         const isCancelled   = updates.status === 'cancelled';
-        const isReassigned  = updates.assignedStaff !== undefined && updates.assignedStaff !== null;
 
-        // 1. Cancellation â€” notify both worker and customer
+        // Only send "new assignment" notification if the worker actually CHANGED
+        const newStaffId = booking.assignedStaff?._id?.toString();
+        const oldStaffId = oldStaff?._id?.toString();
+        const isNewWorkerAssigned = updates.assignedStaff !== undefined
+          && updates.assignedStaff !== null
+          && newStaffId !== oldStaffId;
+
+        // 1. Cancellation — notify both worker and customer
         if (isCancelled) {
           if (oldStaff?.phone) await sendWorkerCancellation({ ...booking.toObject(), assignedStaff: oldStaff });
           await sendCustomerCancellation(booking, updates.cancellationReason);
           return;
         }
 
-        // 2. New staff assigned â†’ full job briefing
-        if (isReassigned && booking.assignedStaff) {
+        // 2. Worker actually changed → send full new-job briefing to new worker
+        if (isNewWorkerAssigned && booking.assignedStaff) {
           await sendWorkerAssignment(booking);
           return;
         }
 
-        // 3. Rescheduled â†’ worker gets reschedule message, customer gets update
+        // 3. Rescheduled → worker gets reschedule message, customer gets update
         if (isRescheduled && booking.assignedStaff) {
           await sendWorkerReschedule(booking, oldDate, oldSlot);
           const changedForCustomer = {};
@@ -378,10 +384,14 @@ const updateBooking = async (req, res, next) => {
           return;
         }
 
-        // 4. Other changes (notes, price, status) â†’ update message to worker
-        const changedFields = Object.keys(updates).filter(f => !['cancellationReason', 'cancelledAt', 'assignedStaff'].includes(f));
-        if (changedFields.length > 0 && booking.assignedStaff) {
-          await sendWorkerBookingUpdate(booking, updates, changedFields);
+        // 4. Only notify worker for changes that MATTER to them (notes/price).
+        //    Status-only changes (confirmed, in_progress, completed) are silent —
+        //    workers already got the full briefing on creation and don't need
+        //    a WhatsApp for every admin status button click.
+        const workerRelevantFields = ['workerNotes', 'totalAmount', 'basePrice'];
+        const relevantChanges = Object.keys(updates).filter(f => workerRelevantFields.includes(f));
+        if (relevantChanges.length > 0 && booking.assignedStaff) {
+          await sendWorkerBookingUpdate(booking, updates, relevantChanges);
         }
       } catch (e) {
         console.error('[UPDATE] Notification error:', e.message);
@@ -396,7 +406,7 @@ const updateBooking = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ Analytics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Analytics â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const getAnalytics = async (req, res, next) => {
   try {
     const { period = '30' } = req.query;
@@ -443,7 +453,7 @@ const getAnalytics = async (req, res, next) => {
   }
 };
 
-// â”€â”€â”€ ADMIN: Clock-in â€” mark worker as started â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ ADMIN: Clock-in â€" mark worker as started â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 // POST /api/bookings/:id/clock-in
 const clockIn = async (req, res, next) => {
   try {
@@ -458,10 +468,10 @@ const clockIn = async (req, res, next) => {
     booking.status = 'in_progress';
     await booking.save();
 
-    // Calculate how late worker arrived (minutes)
-    const slotStartHour = parseSlotStartHour(booking.timeSlot);
+    // Calculate how late worker arrived (minutes) — supports custom HH:MM slots
+    const { hours: startH, minutes: startM } = parseSlotTime(booking.timeSlot, 'start');
     const scheduledStart = new Date(booking.scheduledDate);
-    scheduledStart.setHours(slotStartHour, 0, 0, 0);
+    scheduledStart.setHours(startH, startM, 0, 0);
     const lateMinutes = Math.max(0, Math.round((now - scheduledStart) / 60000));
 
     res.json({
@@ -472,7 +482,7 @@ const clockIn = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€â”€ ADMIN: Clock-out â€” mark worker as finished + detect overtime â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ ADMIN: Clock-out â€" mark worker as finished + detect overtime â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 // POST /api/bookings/:id/clock-out
 const clockOut = async (req, res, next) => {
   try {
@@ -486,10 +496,10 @@ const clockOut = async (req, res, next) => {
     booking.actualEndTime = now;
     booking.status = 'completed';
 
-    // Calculate scheduled end time from the time slot
-    const slotEndHour = parseSlotEndHour(booking.timeSlot);
+    // Calculate scheduled end time — supports custom HH:MM slots
+    const { hours: endH, minutes: endM } = parseSlotTime(booking.timeSlot, 'end');
     const scheduledEnd = new Date(booking.scheduledDate);
-    scheduledEnd.setHours(slotEndHour, 0, 0, 0);
+    scheduledEnd.setHours(endH, endM, 0, 0);
 
     const overtimeMs = now - scheduledEnd;
     booking.overtimeMinutes = Math.max(0, Math.round(overtimeMs / 60000));
@@ -509,9 +519,9 @@ const clockOut = async (req, res, next) => {
       }).sort({ timeSlot: 1 });
 
       nextBookings.forEach((nb) => {
-        const nbSlotStart = parseSlotStartHour(nb.timeSlot);
+        const { hours: nbH, minutes: nbM } = parseSlotTime(nb.timeSlot, 'start');
         const nbStart = new Date(nb.scheduledDate);
-        nbStart.setHours(nbSlotStart, 0, 0, 0);
+        nbStart.setHours(nbH, nbM, 0, 0);
 
         if (now > nbStart) {
           conflicts.push({
@@ -547,7 +557,7 @@ const clockOut = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€â”€ ADMIN: Get overtime alerts for today â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ ADMIN: Get overtime alerts for today â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 // GET /api/bookings/overtime-alerts
 const getOvertimeAlerts = async (req, res, next) => {
   try {
@@ -563,9 +573,9 @@ const getOvertimeAlerts = async (req, res, next) => {
     const alerts = [];
 
     for (const booking of inProgress) {
-      const slotEndHour = parseSlotEndHour(booking.timeSlot);
+      const { hours: slotEndH, minutes: slotEndM } = parseSlotTime(booking.timeSlot, 'end');
       const scheduledEnd = new Date(booking.scheduledDate);
-      scheduledEnd.setHours(slotEndHour, 0, 0, 0);
+      scheduledEnd.setHours(slotEndH, slotEndM, 0, 0);
 
       if (now > scheduledEnd) {
         const overtimeMinutes = Math.round((now - scheduledEnd) / 60000);
@@ -606,29 +616,25 @@ const getOvertimeAlerts = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Parse "08:00 AM - 10:00 AM" â†’ start hour (8) and end hour (10)
-const parseSlotStartHour = (slot) => {
-  if (!slot) return 8;
-  const [startPart] = slot.split(' - ');
-  const [time, period] = startPart.trim().split(' ');
-  let hour = parseInt(time.split(':')[0]);
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
-  return hour;
+// â"€â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// Parse "08:00 AM - 10:00 AM" â†' start hour (8) and end hour (10)
+// Parse "07:30 AM - 08:30 AM" -> { hours, minutes } for start or end
+const parseSlotTime = (slot, which) => {
+  if (!slot) return { hours: which === 'start' ? 8 : 10, minutes: 0 };
+  const parts = slot.split(' - ');
+  const part = (which === 'start' ? parts[0] : parts[1])?.trim();
+  if (!part) return { hours: which === 'start' ? 8 : 10, minutes: 0 };
+  const [timePart, period] = part.split(' ');
+  const [hStr, mStr] = timePart.split(':');
+  let hours = parseInt(hStr, 10);
+  const minutes = parseInt(mStr || '0', 10);
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  return { hours, minutes };
 };
 
-const parseSlotEndHour = (slot) => {
-  if (!slot) return 10;
-  const parts = slot.split(' - ');
-  const endPart = parts[1]?.trim();
-  if (!endPart) return 10;
-  const [time, period] = endPart.split(' ');
-  let hour = parseInt(time.split(':')[0]);
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
-  return hour;
-};
+const parseSlotStartHour = (slot) => parseSlotTime(slot, 'start').hours;
+const parseSlotEndHour   = (slot) => parseSlotTime(slot, 'end').hours;
 
 const getDayRange = (date) => {
   const startOfDay = new Date(date);
@@ -655,7 +661,7 @@ const resendWorkerMessage = async (req, res, next) => {
       sent: result.success,
       message: result.success
         ? `Full job details sent to ${booking.assignedStaff.name} on WhatsApp`
-        : `Green API not configured — ${result.reason || result.error}`,
+        : result.reason || 'Failed to send WhatsApp message',
     });
   } catch (err) { next(err); }
 };

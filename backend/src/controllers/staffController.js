@@ -181,7 +181,7 @@ const sendDaySchedule = async (req, res, next) => {
       sent: result.success,
       message: result.success
         ? `Schedule sent to ${worker.name}`
-        : `Twilio not configured — message logged. (${result.reason || result.error || 'check server logs'})`,
+        : result.reason || 'Failed to send WhatsApp message',
       jobCount: bookings.length,
     });
   } catch (err) { next(err); }
@@ -210,7 +210,7 @@ const notifyWorker = async (req, res, next) => {
       sent: result.success,
       message: result.success
         ? `Message sent to ${worker.name}`
-        : `Twilio not configured — message logged. (${result.reason || result.error || 'check server logs'})`,
+        : result.reason || 'Failed to send WhatsApp message',
     });
   } catch (err) { next(err); }
 };

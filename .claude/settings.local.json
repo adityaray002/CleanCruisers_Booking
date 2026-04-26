@@ -9,7 +9,13 @@
       "Bash(npm install *)",
       "Bash(npm list *)",
       "Bash(npx pwa-assets-generator *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Booking Software\\\\backend\\\\src\\\\controllers\\\\bookingController.js' -Raw\\) -replace [char]0x2018, [char]0x0027 -replace [char]0x2019, [char]0x0027 -replace [char]0x201C, [char]0x0022 -replace [char]0x201D, [char]0x0022 | Set-Content 'C:\\\\Booking Software\\\\backend\\\\src\\\\controllers\\\\bookingController.js' -NoNewline -Encoding utf8\")",
+      "Bash(powershell -Command \"Select-String -Path 'C:\\\\Booking Software\\\\backend\\\\src\\\\controllers\\\\bookingController.js' -Pattern '[\\\\u2018\\\\u2019\\\\u201C\\\\u201D]' | Select-Object LineNumber, Line\")",
+      "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./src/utils/notifications.js'\\); console.log\\('notifications OK'\\);\")",
+      "Bash(node -e \"require\\('./src/controllers/staffController.js'\\); console.log\\('staffController OK'\\);\")",
+      "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('bookingController OK'\\);\")"
     ]
   }
 }

@@ -65,6 +65,7 @@ export const bookingsAPI = {
   getOvertimeAlerts: () => api.get('/bookings/overtime-alerts'),
   clockIn: (id) => api.post(`/bookings/${id}/clock-in`, {}),
   clockOut: (id) => api.post(`/bookings/${id}/clock-out`, {}),
+  resendWorkerMessage: (id) => api.post(`/bookings/${id}/resend-worker`, {}),
 };
 
 export const staffAPI = {
@@ -77,6 +78,10 @@ export const staffAPI = {
     api.get('/staff/available', { params: { date, serviceType } }),
   getBySlot: (date, timeSlot) =>
     api.get('/staff/slots', { params: { date, timeSlot } }),
+  notifySchedule: (id, date) =>
+    api.post(`/staff/${id}/notify-schedule`, {}, { params: { date } }),
+  notify: (id, message, bookingId) =>
+    api.post(`/staff/${id}/notify`, { message, ...(bookingId && { bookingId }) }),
 };
 
 export const paymentsAPI = {

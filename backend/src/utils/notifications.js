@@ -68,12 +68,20 @@ const sendWhatsApp = (phone, message) => {
             console.log(`[WHATSAPP ✅] Sent to ${phone} (id: ${json.idMessage})`);
             resolve({ success: true, id: json.idMessage });
           } else {
-            console.error(`[WHATSAPP ❌] Green API error for ${phone}:`, data.slice(0, 200));
-            resolve({ success: false, error: data.slice(0, 200) });
+            // Parse a human-readable reason from the Green API response
+            const invokeStatus = json?.invokeStatus || {};
+            const apiDesc = invokeStatus.description || json?.message || '';
+            const isQuota = invokeStatus.status === 'QUOTE_ALLOWED'
+              || apiDesc.toLowerCase().includes('quota');
+            const reason = isQuota
+              ? 'WhatsApp monthly quota exceeded — upgrade your Green API plan at green-api.com'
+              : apiDesc || `Green API error (HTTP ${res.statusCode})`;
+            console.error(`[WHATSAPP ❌] ${reason} — phone: ${phone}`);
+            resolve({ success: false, reason, raw: data.slice(0, 300) });
           }
         } catch {
           console.error(`[WHATSAPP ❌] Green API parse error:`, data.slice(0, 200));
-          resolve({ success: false, error: data.slice(0, 200) });
+          resolve({ success: false, reason: 'Green API returned an unexpected response', raw: data.slice(0, 200) });
         }
       });
     });

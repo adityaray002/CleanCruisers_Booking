@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:cleancruisers.in)",
+      "WebFetch(domain:sofashine.in)",
+      "WebFetch(domain:www.cleancruisers.in)",
+      "Bash(powershell -Command \"\\(Get-Content backend\\\\src\\\\controllers\\\\bookingController.js\\) -replace \\\\\"populate\\\\\\('assignedStaff', 'name phone rating'\\\\\\)\\\\\", \\\\\"populate\\('assignedStaff', 'name phone rating whatsappApiKey'\\)\\\\\" | Set-Content backend\\\\src\\\\controllers\\\\bookingController.js -Encoding utf8\")",
+      "Bash(node -e \"const p = new URLSearchParams\\({phone:'919876543210',text:'Hello\\\\nWorld',apikey:'123'}\\); console.log\\(p.toString\\(\\)\\)\")",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(npx pwa-assets-generator *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

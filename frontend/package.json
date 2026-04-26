@@ -1,0 +1,32 @@
+{
+  "name": "cleancruisers-frontend",
+  "version": "1.0.0",
+  "description": "CleanCruisers & SofaShine Booking Frontend",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "generate-icons": "pwa-assets-generator --preset minimal-2023 public/icon.svg"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "date-fns": "^3.0.6",
+    "lucide-react": "^0.303.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^6.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@vite-pwa/assets-generator": "^1.0.2",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "vite": "^5.0.10",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

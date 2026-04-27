@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const addressSchema = new mongoose.Schema(
   {
-    line1: { type: String, required: true },
+    line1: { type: String, default: '' },
     line2: { type: String },
     city: { type: String, default: '' },
     state: { type: String, default: '' },

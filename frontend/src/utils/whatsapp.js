@@ -30,6 +30,13 @@ export const openWhatsApp = (phone, message) => {
 
 // ─── Message builders (mirror backend notifications.js templates) ─────────────
 
+// Returns a Google Maps deep-link line if coordinates exist, otherwise empty string
+const mapsLine = (address) => {
+  const { lat, lng } = address?.coordinates || {};
+  if (lat && lng) return `\n🗺️ *Live Location:* https://maps.google.com/?q=${lat},${lng}`;
+  return '';
+};
+
 export const buildWorkerAssignmentMsg = (booking) => {
   const worker = booking.assignedStaff;
   return (
@@ -47,7 +54,8 @@ export const buildWorkerAssignmentMsg = (booking) => {
     (booking.address?.line2 ? `, ${booking.address.line2}` : '') +
     `, ${booking.address?.city}` +
     (booking.address?.pincode ? ` - ${booking.address.pincode}` : '') +
-    (booking.address?.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') + '\n' +
+    (booking.address?.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') +
+    mapsLine(booking.address) + '\n' +
     `💰 *Amount:* ${booking.totalAmount === 0 ? 'TBD — admin will confirm' : `₹${booking.totalAmount}`}\n` +
     `💳 *Payment:* ${booking.payment?.method === 'cod' ? 'Collect cash' : 'Already paid online'}\n` +
     (booking.workerNotes ? `\n⚠️ *NOTES:*\n${booking.workerNotes}\n` : '') +
@@ -69,7 +77,8 @@ export const buildWorkerDayScheduleMsg = (worker, bookings, date) => {
       `⏰ ${b.timeSlot}\n` +
       `🧹 ${b.serviceLabel}\n` +
       `👤 ${b.customerName} · 📞 ${b.customerPhone}\n` +
-      `📍 ${b.address?.line1}${b.address?.landmark ? ` (${b.address.landmark})` : ''}, ${b.address?.city}\n` +
+      `📍 ${b.address?.line1}${b.address?.landmark ? ` (${b.address.landmark})` : ''}, ${b.address?.city}` +
+      mapsLine(b.address) + '\n' +
       `💰 ${b.totalAmount === 0 ? 'Amount TBD' : `₹${b.totalAmount} (${b.payment?.method === 'cod' ? 'Cash' : 'Paid'})`}` +
       (b.workerNotes ? `\n⚠️ ${b.workerNotes}` : '')
     )
@@ -105,7 +114,8 @@ export const buildWorkerPingMsg = (worker, booking, customMessage) => {
       (booking.address?.line2 ? `, ${booking.address.line2}` : '') +
       `, ${booking.address?.city}` +
       (booking.address?.pincode ? ` - ${booking.address.pincode}` : '') +
-      (booking.address?.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') + '\n\n' +
+      (booking.address?.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') +
+      mapsLine(booking.address) + '\n\n' +
       `💰 *Amount:* ${booking.totalAmount === 0 ? 'TBD' : `₹${booking.totalAmount}`}\n` +
       `💳 *Payment:* ${booking.payment?.method === 'cod' ? 'Collect cash from customer' : 'Already paid online'}\n` +
       (booking.workerNotes ? `\n⚠️ *Worker Notes:*\n${booking.workerNotes}\n` : '') +

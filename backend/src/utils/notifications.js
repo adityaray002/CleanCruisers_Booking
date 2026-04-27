@@ -24,6 +24,13 @@ const formatDateShort = (date) =>
     weekday: 'short', day: 'numeric', month: 'short',
   });
 
+// Returns a Google Maps link line if coordinates were captured, otherwise empty
+const mapsLine = (address) => {
+  const { lat, lng } = address?.coordinates || {};
+  if (lat && lng) return `\n🗺️ *Live Location:* https://maps.google.com/?q=${lat},${lng}`;
+  return '';
+};
+
 // ─── Green API — Free WhatsApp ────────────────────────────────────────────────
 // Sign up at green-api.com (free), create instance, scan QR with your WhatsApp.
 // Set GREEN_API_INSTANCE_ID and GREEN_API_TOKEN in .env
@@ -178,7 +185,8 @@ const sendWorkerAssignment = async (booking) => {
     (booking.address.line2 ? `, ${booking.address.line2}` : '') +
     `, ${booking.address.city}` +
     (booking.address.pincode ? ` - ${booking.address.pincode}` : '') +
-    (booking.address.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') + '\n' +
+    (booking.address.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') +
+    mapsLine(booking.address) + '\n' +
     `💰 *Amount:* ${booking.totalAmount === 0 ? 'TBD — admin will confirm' : `₹${booking.totalAmount}`}\n` +
     `💳 *Payment:* ${booking.payment?.method === 'cod' ? 'Collect cash' : 'Already paid online'}\n` +
     (booking.workerNotes ? `\n⚠️ *NOTES:*\n${booking.workerNotes}\n` : '') +
@@ -238,7 +246,8 @@ const sendWorkerReschedule = async (booking, oldDate, oldSlot) => {
     `🧹 *Service:* ${booking.serviceLabel}\n` +
     `👤 *Customer:* ${booking.customerName}\n` +
     `📞 *Phone:* ${booking.customerPhone}\n` +
-    `📍 *Address:* ${booking.address.line1}, ${booking.address.city}\n` +
+    `📍 *Address:* ${booking.address.line1}, ${booking.address.city}` +
+    mapsLine(booking.address) + '\n' +
     (booking.workerNotes ? `\n⚠️ *Notes:* ${booking.workerNotes}\n` : '') +
     `\n_${SERVICE_NAME}_`;
 
@@ -258,7 +267,8 @@ const sendWorkerOvertimeAlert = async (worker, booking, nextBooking) => {
       ? `⚠️ *NEXT BOOKING IS WAITING:*\n` +
         `🧹 ${nextBooking.serviceLabel}\n` +
         `👤 ${nextBooking.customerName} · 📞 ${nextBooking.customerPhone}\n` +
-        `📍 ${nextBooking.address?.line1}, ${nextBooking.address?.city}\n` +
+        `📍 ${nextBooking.address?.line1}, ${nextBooking.address?.city}` +
+        mapsLine(nextBooking.address) + '\n' +
         `⏰ Slot: ${nextBooking.timeSlot}\n\n` +
         `Please inform admin about the delay!\n`
       : `Please wrap up and inform admin.\n`) +
@@ -282,7 +292,8 @@ const sendWorkerDaySchedule = async (worker, bookings, date) => {
     `⏰ ${b.timeSlot}\n` +
     `🧹 ${b.serviceLabel}\n` +
     `👤 ${b.customerName} · 📞 ${b.customerPhone}\n` +
-    `📍 ${b.address.line1}${b.address.landmark ? ` (${b.address.landmark})` : ''}, ${b.address.city}\n` +
+    `📍 ${b.address.line1}${b.address.landmark ? ` (${b.address.landmark})` : ''}, ${b.address.city}` +
+    mapsLine(b.address) + '\n' +
     `💰 ${b.totalAmount === 0 ? 'Amount TBD' : `₹${b.totalAmount} (${b.payment?.method === 'cod' ? 'Cash' : 'Paid'})`}` +
     (b.workerNotes ? `\n⚠️ ${b.workerNotes}` : '')
   ).join('\n\n');
@@ -321,7 +332,8 @@ const sendWorkerManualPing = async (worker, booking, customMessage) => {
       (booking.address?.line2 ? `, ${booking.address.line2}` : '') +
       `, ${booking.address?.city}` +
       (booking.address?.pincode ? ` - ${booking.address.pincode}` : '') +
-      (booking.address?.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') + '\n\n' +
+      (booking.address?.landmark ? `\n🏷️ *Landmark:* ${booking.address.landmark}` : '') +
+      mapsLine(booking.address) + '\n\n' +
       `💰 *Amount:* ${booking.totalAmount === 0 ? 'TBD' : `₹${booking.totalAmount}`}\n` +
       `💳 *Payment:* ${booking.payment?.method === 'cod' ? 'Collect cash from customer' : 'Already paid online'}\n` +
       (booking.workerNotes ? `\n⚠️ *Worker Notes:*\n${booking.workerNotes}\n` : '') +

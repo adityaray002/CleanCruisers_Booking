@@ -28,6 +28,7 @@ export default function BookingPage() {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
   // Fetch services on mount
@@ -74,6 +75,30 @@ export default function BookingPage() {
       ...f,
       addOnIds: f.addOnIds.includes(id) ? f.addOnIds.filter((a) => a !== id) : [...f.addOnIds, id],
     }));
+  };
+
+  const captureLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Your browser does not support location sharing');
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updateAddress('coordinates', { lat: pos.coords.latitude, lng: pos.coords.longitude });
+        toast.success('Location pinned! Worker will get a Google Maps link.');
+        setLocationLoading(false);
+      },
+      (err) => {
+        const msg =
+          err.code === err.PERMISSION_DENIED
+            ? 'Location access denied — please allow it in your browser settings'
+            : 'Could not get your location, please try again';
+        toast.error(msg);
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const validateStep = () => {
@@ -449,6 +474,55 @@ export default function BookingPage() {
                       placeholder="Near XYZ Mall"
                     />
                   </div>
+                </div>
+
+                {/* GPS location pin */}
+                <div className="pt-1">
+                  <label className="label mb-1.5">📍 Pin Your Exact Location <span className="text-gray-400 font-normal">(Recommended)</span></label>
+                  {form.address.coordinates?.lat ? (
+                    <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                      <span className="text-green-600 text-lg">✅</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-800">Location pinned successfully</p>
+                        <p className="text-xs text-green-600 mt-0.5">
+                          {form.address.coordinates.lat.toFixed(5)}, {form.address.coordinates.lng.toFixed(5)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <a
+                          href={`https://maps.google.com/?q=${form.address.coordinates.lat},${form.address.coordinates.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline font-medium"
+                        >
+                          View ↗
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => updateAddress('coordinates', null)}
+                          className="text-xs text-red-400 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={captureLocation}
+                      disabled={locationLoading}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50/50 transition-all text-sm font-medium disabled:opacity-60"
+                    >
+                      {locationLoading ? (
+                        <><LoadingSpinner size="sm" /> Getting your location…</>
+                      ) : (
+                        <>📍 Share My Current Location</>
+                      )}
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Sends a Google Maps link to your worker so they can navigate directly to you
+                  </p>
                 </div>
               </div>
             )}

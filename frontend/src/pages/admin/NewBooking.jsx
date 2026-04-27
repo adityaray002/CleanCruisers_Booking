@@ -83,6 +83,7 @@ export default function NewBooking() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [pastBookings, setPastBookings] = useState([]);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -159,11 +160,50 @@ export default function NewBooking() {
     }
   };
 
+  const [coordPasteValue, setCoordPasteValue] = useState('');
+
+  const captureLocation = () => {
+    if (!navigator.geolocation) { toast.error('Geolocation not supported by this browser'); return; }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setAddr('coordinates', { lat: pos.coords.latitude, lng: pos.coords.longitude });
+        toast.success('Location pinned — Google Maps link will be sent to worker');
+        setLocationLoading(false);
+      },
+      (err) => {
+        toast.error(err.code === err.PERMISSION_DENIED
+          ? 'Location access denied'
+          : 'Could not get location, please try again');
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // Parse customer coordinates pasted from WhatsApp message.
+  // Accepts: "28.6302829,77.0141382"  OR  "https://maps.google.com/?q=28.6302829,77.0141382"
+  const parseAndSetCoords = (raw) => {
+    setCoordPasteValue(raw);
+    const match = raw.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+    if (match) {
+      const lat = parseFloat(match[1]);
+      const lng = parseFloat(match[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        setAddr('coordinates', { lat, lng });
+        setCoordPasteValue('');
+        toast.success('Customer location set from WhatsApp coordinates');
+      }
+    }
+  };
+
   const validate = () => {
     const e = {};
     if (!form.customerName.trim()) e.customerName = 'Required';
     if (!form.customerPhone.trim()) e.customerPhone = 'Required';
-    if (!form.address.line1.trim()) e['address.line1'] = 'Required';
+    const hasAddress = !!form.address.line1.trim();
+    const hasCoords  = !!(form.address.coordinates?.lat && form.address.coordinates?.lng);
+    if (!hasAddress && !hasCoords) e['address.line1'] = 'Enter an address or paste GPS coordinates above';
     if (!form.scheduledDate) e.scheduledDate = 'Required';
     if (!form.timeSlot) e.timeSlot = 'Required';
     if (!form.serviceName.trim()) e.serviceName = 'Required';
@@ -310,11 +350,14 @@ export default function NewBooking() {
             <MapPin className="w-4 h-4 text-primary-600" /> Service Address
           </h2>
           <div>
-            <label className="label">Address *</label>
+            <label className="label">
+              Address
+              <span className="ml-1.5 text-xs font-normal text-gray-400">(or paste GPS below)</span>
+            </label>
             <input
               className={`input-field ${errors['address.line1'] ? 'input-error' : ''}`}
               value={form.address.line1}
-              onChange={(e) => setAddr('line1', e.target.value)}
+              onChange={(e) => { setAddr('line1', e.target.value); setErrors((er) => ({ ...er, 'address.line1': undefined })); }}
               placeholder="House/Flat no., Street, Area"
             />
             {errors['address.line1'] && <p className="text-red-500 text-xs mt-1">{errors['address.line1']}</p>}
@@ -332,6 +375,63 @@ export default function NewBooking() {
               <label className="label">Landmark</label>
               <input className="input-field" value={form.address.landmark} onChange={(e) => setAddr('landmark', e.target.value)} placeholder="Near Metro" />
             </div>
+          </div>
+
+          {/* GPS / Coordinates — always visible, independent of address fields */}
+          <div className="border-t border-gray-100 pt-4">
+            <label className="label mb-2">
+              📍 Customer GPS Location
+              <span className="ml-1.5 text-xs font-normal text-gray-400">
+                (sends Google Maps link to worker — optional but recommended)
+              </span>
+            </label>
+
+            {form.address.coordinates?.lat ? (
+              /* ── Pinned state ── */
+              <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+                <MapPin className="w-4 h-4 text-green-600 shrink-0" />
+                <div className="flex-1 text-sm">
+                  <span className="font-medium text-green-800">Location pinned ✅</span>
+                  <span className="text-green-600 ml-2 text-xs">
+                    {form.address.coordinates.lat.toFixed(5)}, {form.address.coordinates.lng.toFixed(5)}
+                  </span>
+                </div>
+                <div className="flex gap-3 shrink-0">
+                  <a
+                    href={`https://maps.google.com/?q=${form.address.coordinates.lat},${form.address.coordinates.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    View ↗
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => { setAddr('coordinates', null); setCoordPasteValue(''); }}
+                    className="text-xs text-red-400 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── Input state ── */
+              <div className="space-y-2">
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    className="input-field pl-9 text-sm"
+                    value={coordPasteValue}
+                    onChange={(e) => parseAndSetCoords(e.target.value)}
+                    onPaste={(e) => setTimeout(() => parseAndSetCoords(e.target.value), 0)}
+                    placeholder="Paste: 28.6302829,77.0141382  or  maps.google.com/?q=…"
+                  />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Paste the coordinates or Google Maps link from the customer's WhatsApp message — auto-detected on paste.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

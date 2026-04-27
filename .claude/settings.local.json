@@ -15,7 +15,10 @@
       "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('OK'\\);\")",
       "Bash(node -e \"require\\('./src/utils/notifications.js'\\); console.log\\('notifications OK'\\);\")",
       "Bash(node -e \"require\\('./src/controllers/staffController.js'\\); console.log\\('staffController OK'\\);\")",
-      "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('bookingController OK'\\);\")"
+      "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('bookingController OK'\\);\")",
+      "Bash(node -e \"require\\('./src/utils/notifications.js'\\); console.log\\('OK'\\);\")",
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/eslint src/pages/admin/NewBooking.jsx --max-warnings=0)"
     ]
   }
 }

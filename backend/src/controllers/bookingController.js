@@ -128,7 +128,9 @@ const adminCreateBooking = async (req, res, next) => {
     if (!serviceName?.trim()) return res.status(400).json({ success: false, message: 'Service name is required.' });
     if (!scheduledDate) return res.status(400).json({ success: false, message: 'Date is required.' });
     if (!timeSlot) return res.status(400).json({ success: false, message: 'Time slot is required.' });
-    if (!address?.line1?.trim()) return res.status(400).json({ success: false, message: 'Address is required.' });
+    const hasAddress = !!address?.line1?.trim();
+    const hasCoords  = !!(address?.coordinates?.lat && address?.coordinates?.lng);
+    if (!hasAddress && !hasCoords) return res.status(400).json({ success: false, message: 'Provide either an address or GPS coordinates.' });
 
     const parsedPrice = Number(price) || 0;
 
@@ -168,6 +170,9 @@ const adminCreateBooking = async (req, res, next) => {
         state: address.state || '',
         pincode: address.pincode || '',
         landmark: address.landmark || '',
+        ...(address.coordinates?.lat && address.coordinates?.lng
+          ? { coordinates: { lat: address.coordinates.lat, lng: address.coordinates.lng } }
+          : {}),
       },
       basePrice: parsedPrice,
       addOnPrice: 0,

@@ -18,7 +18,10 @@
       "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('bookingController OK'\\);\")",
       "Bash(node -e \"require\\('./src/utils/notifications.js'\\); console.log\\('OK'\\);\")",
       "Bash(npx tsc *)",
-      "Bash(node_modules/.bin/eslint src/pages/admin/NewBooking.jsx --max-warnings=0)"
+      "Bash(node_modules/.bin/eslint src/pages/admin/NewBooking.jsx --max-warnings=0)",
+      "Bash(node -e ' *)",
+      "Bash(node patch_clash.js)",
+      "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('Syntax OK'\\);\")"
     ]
   }
 }

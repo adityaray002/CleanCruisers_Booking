@@ -2,6 +2,30 @@ const Staff = require('../models/Staff');
 const Booking = require('../models/Booking');
 const { sendWorkerDaySchedule, sendWorkerManualPing } = require('../utils/notifications');
 
+// ── Slot overlap helpers ──────────────────────────────────────────────────────
+// Convert "08:30 AM" → minutes since midnight
+const timeToMins = (t) => {
+  if (!t) return 0;
+  const [timePart, period] = t.trim().split(' ');
+  const [hStr, mStr] = timePart.split(':');
+  let h = parseInt(hStr, 10);
+  const m = parseInt(mStr || '0', 10);
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+};
+// "08:00 AM - 10:00 AM" → { start: 480, end: 600 }
+const slotToRange = (slot) => {
+  const parts = (slot || '').split(' - ');
+  return { start: timeToMins(parts[0]), end: timeToMins(parts[1]) };
+};
+// Two slots overlap when one starts before the other ends (open-interval: touching is NOT a clash)
+const slotsOverlap = (a, b) => {
+  const ra = slotToRange(a);
+  const rb = slotToRange(b);
+  return ra.start < rb.end && rb.start < ra.end;
+};
+
 // @desc    Get all staff
 const getStaff = async (req, res, next) => {
   try {
@@ -67,39 +91,28 @@ const getStaffBySlot = async (req, res, next) => {
 
     const allStaff = await Staff.find({ isActive: true }).sort({ name: 1 });
 
-    // Get bookings for that day (and specific slot if provided)
-    const slotFilter = {
+    // Fetch ALL bookings for that day in one query — used for both overlap check and day load
+    const allDayBookings = await Booking.find({
       scheduledDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $nin: ['cancelled'] },
-    };
-    if (timeSlot) slotFilter.timeSlot = timeSlot;
+    }).select('assignedStaff customerName serviceLabel timeSlot status').lean();
 
-    const slotBookings = await Booking.find(slotFilter)
-      .select('assignedStaff customerName serviceLabel timeSlot status')
-      .lean();
-
-    // Build a map: staffId -> booking (for the requested slot)
+    // staffBookingMap: staffId → bookings whose slot OVERLAPS with the requested timeSlot
+    // (exact match is wrong — "10 AM-1 PM" and "10 AM-11 AM" overlap even though strings differ)
     const staffBookingMap = {};
-    slotBookings.forEach((b) => {
-      if (b.assignedStaff) {
-        const key = b.assignedStaff.toString();
+    const dayLoadMap = {};
+    allDayBookings.forEach((b) => {
+      if (!b.assignedStaff) return;
+      const key = b.assignedStaff.toString();
+
+      // day load — every booking counts
+      if (!dayLoadMap[key]) dayLoadMap[key] = [];
+      dayLoadMap[key].push(b);
+
+      // clash check — only bookings that overlap with the requested slot
+      if (timeSlot && slotsOverlap(timeSlot, b.timeSlot)) {
         if (!staffBookingMap[key]) staffBookingMap[key] = [];
         staffBookingMap[key].push(b);
-      }
-    });
-
-    // Also get all day bookings per worker for daily load info
-    const dayBookings = await Booking.find({
-      scheduledDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $nin: ['cancelled'] },
-    }).select('assignedStaff timeSlot serviceLabel customerName').lean();
-
-    const dayLoadMap = {};
-    dayBookings.forEach((b) => {
-      if (b.assignedStaff) {
-        const key = b.assignedStaff.toString();
-        if (!dayLoadMap[key]) dayLoadMap[key] = [];
-        dayLoadMap[key].push(b);
       }
     });
 

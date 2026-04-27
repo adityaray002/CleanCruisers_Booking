@@ -134,21 +134,23 @@ const adminCreateBooking = async (req, res, next) => {
 
     const parsedPrice = Number(price) || 0;
 
-    // Worker clash check â€" atomic: check then create
+    // Worker clash check — fetch all day bookings and test for TIME OVERLAP
+    // (exact timeSlot string match misses overlapping slots like "10 AM-1 PM" vs "10 AM-11 AM")
     if (assignedStaffId) {
       const { startOfDay, endOfDay } = getDayRange(scheduledDate);
-      const clash = await Booking.findOne({
+      const workerDayBookings = await Booking.find({
         assignedStaff: assignedStaffId,
         scheduledDate: { $gte: startOfDay, $lte: endOfDay },
-        timeSlot,
         status: { $nin: ['cancelled'] },
-      }).populate('assignedStaff', 'name');
+      }).populate('assignedStaff', 'name').lean();
+
+      const clash = workerDayBookings.find((b) => slotsOverlapLocal(timeSlot, b.timeSlot));
 
       if (clash) {
         const workerName = clash.assignedStaff?.name || 'This worker';
         return res.status(409).json({
           success: false,
-          message: `âš ï¸ Clash detected! ${workerName} is already booked at ${timeSlot} for "${clash.serviceLabel}" (${clash.customerName}). Please assign a different worker or change the time slot.`,
+          message: `⚠️ Clash detected! ${workerName} is already booked at ${clash.timeSlot} for "${clash.serviceLabel}" (${clash.customerName}). The new slot ${timeSlot} overlaps with it.`,
         });
       }
     }
@@ -622,6 +624,26 @@ const getOvertimeAlerts = async (req, res, next) => {
 };
 
 // â"€â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+
+// Two time slots overlap when one starts before the other ends (open-interval)
+const slotsOverlapLocal = (a, b) => {
+  const toMins = (t) => {
+    if (!t) return 0;
+    const [tp, period] = t.trim().split(' ');
+    const [hStr, mStr] = tp.split(':');
+    let h = parseInt(hStr, 10);
+    const m = parseInt(mStr || '0', 10);
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
+  };
+  const ra = (a || '').split(' - ');
+  const rb = (b || '').split(' - ');
+  const s1 = toMins(ra[0]), e1 = toMins(ra[1]);
+  const s2 = toMins(rb[0]), e2 = toMins(rb[1]);
+  return s1 < e2 && s2 < e1;
+};
+
 // Parse "08:00 AM - 10:00 AM" â†' start hour (8) and end hour (10)
 // Parse "07:30 AM - 08:30 AM" -> { hours, minutes } for start or end
 const parseSlotTime = (slot, which) => {

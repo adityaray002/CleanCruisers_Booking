@@ -254,7 +254,11 @@ const getBookings = async (req, res, next) => {
     } = req.query;
 
     const filter = {};
-    if (status) filter.status = status;
+    if (status) {
+      filter.status = status;
+    } else if (req.query.excludeCancelled === 'true') {
+      filter.status = { $nin: ['cancelled'] };
+    }
     if (serviceLabel) filter.serviceLabel = { $regex: serviceLabel, $options: 'i' };
     if (staffId) filter.assignedStaff = staffId;
     if (source) filter.source = source;

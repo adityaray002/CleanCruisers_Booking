@@ -21,7 +21,9 @@
       "Bash(node_modules/.bin/eslint src/pages/admin/NewBooking.jsx --max-warnings=0)",
       "Bash(node -e ' *)",
       "Bash(node patch_clash.js)",
-      "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('Syntax OK'\\);\")"
+      "Bash(node -e \"require\\('./src/controllers/bookingController.js'\\); console.log\\('Syntax OK'\\);\")",
+      "Bash(node patch_update_clash.js)",
+      "Bash(rm patch_update_clash.js)"
     ]
   }
 }

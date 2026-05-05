@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Phone, User, MapPin, Calendar, Clock, IndianRupee,
   FileText, CheckCircle, AlertTriangle, Search, Loader2,
-  PhoneCall, Store, Globe,
+  PhoneCall, Store, Globe, RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminLayout from '../../components/AdminLayout';
@@ -58,6 +58,8 @@ const SOURCE_OPTIONS = [
   { id: 'admin', label: 'Admin Entry', icon: Globe },
 ];
 
+const DRAFT_KEY = 'newBookingDraft';
+
 const EMPTY = {
   customerPhone: '', customerName: '', customerEmail: '',
   address: { line1: '', line2: '', city: '', state: '', pincode: '', landmark: '' },
@@ -70,6 +72,16 @@ const EMPTY = {
   paymentMethod: 'cod',
   source: 'phone',
 };
+
+const saveDraft  = (form, startTime, endTime) =>
+  sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ form, startTime, endTime }));
+
+const loadDraft = () => {
+  try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null'); }
+  catch { return null; }
+};
+
+const clearDraft = () => sessionStorage.removeItem(DRAFT_KEY);
 
 export default function NewBooking() {
   const navigate = useNavigate();
@@ -86,10 +98,22 @@ export default function NewBooking() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [draftRestored, setDraftRestored] = useState(false);
 
-  // Auto-focus phone; pre-fill from URL params (date + slot passed by ScheduleView's + button)
+  // ── On mount: restore draft (if any) then apply URL overrides ───────────────
   useEffect(() => {
     phoneRef.current?.focus();
+
+    // Restore draft first
+    const draft = loadDraft();
+    if (draft?.form) {
+      setForm(draft.form);
+      if (draft.startTime) setStartTime(draft.startTime);
+      if (draft.endTime)   setEndTime(draft.endTime);
+      setDraftRestored(true);
+    }
+
+    // URL params (from ScheduleView + button) always override the draft
     const dateParam = searchParams.get('date');
     const slotParam = searchParams.get('slot');
     if (dateParam) setForm((f) => ({ ...f, scheduledDate: dateParam }));
@@ -101,6 +125,14 @@ export default function NewBooking() {
       }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-save draft whenever form / times change ──────────────────────────
+  useEffect(() => {
+    // Don't save if the form is completely empty (nothing typed yet)
+    const hasContent = form.customerPhone || form.customerName || form.serviceName
+      || form.address.line1 || form.scheduledDate;
+    if (hasContent) saveDraft(form, startTime, endTime);
+  }, [form, startTime, endTime]);
 
   // Whenever start/end times change → rebuild the timeSlot string
   useEffect(() => {
@@ -233,6 +265,7 @@ export default function NewBooking() {
         source: form.source,
       });
       const booking = res.data.data;
+      clearDraft();
       toast.success(`Booking ${booking.bookingId} created!`);
       navigate('/admin/schedule');
     } catch (err) {
@@ -243,12 +276,41 @@ export default function NewBooking() {
     }
   };
 
+  const handleStartFresh = () => {
+    clearDraft();
+    setForm({ ...EMPTY });
+    setStartTime('');
+    setEndTime('');
+    setCoordPasteValue('');
+    setPastBookings([]);
+    setErrors({});
+    setDraftRestored(false);
+    phoneRef.current?.focus();
+  };
+
   const todayStr = new Date().toISOString().split('T')[0];
   const maxDateStr = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   return (
     <AdminLayout title="New Booking">
       <div className="max-w-3xl mx-auto space-y-6">
+
+        {/* ── Draft-restored banner ── */}
+        {draftRestored && (
+          <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-amber-800">
+              <span className="text-base">📝</span>
+              <span><strong>Draft restored</strong> — your previous progress has been loaded automatically.</span>
+            </div>
+            <button
+              onClick={handleStartFresh}
+              className="flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-red-600 whitespace-nowrap border border-amber-300 hover:border-red-300 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Start fresh
+            </button>
+          </div>
+        )}
 
         {/* Source badges */}
         <div className="flex items-center gap-3">

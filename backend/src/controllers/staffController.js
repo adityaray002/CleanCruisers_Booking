@@ -116,11 +116,17 @@ const getStaffBySlot = async (req, res, next) => {
       }
     });
 
+    const dateStr = new Date(date).toDateString();
+
     const result = allStaff.map((s) => {
       const id = s._id.toString();
-      const worksOnDay = s.availability?.some(
-        (a) => a.dayOfWeek === dayOfWeek && a.isAvailable
-      );
+
+      // Date override takes priority over day-of-week schedule
+      const override = s.dateOverrides?.find((o) => new Date(o.date).toDateString() === dateStr);
+      const worksOnDay = override !== undefined
+        ? override.isAvailable
+        : s.availability?.some((a) => a.dayOfWeek === dayOfWeek && a.isAvailable);
+
       const slotBookingsForStaff = staffBookingMap[id] || [];
       const busyAtSlot = timeSlot ? slotBookingsForStaff.length > 0 : false;
       const dayLoad = dayLoadMap[id] || [];
@@ -135,6 +141,7 @@ const getStaffBySlot = async (req, res, next) => {
         slotBooking: busyAtSlot ? slotBookingsForStaff[0] : null,
         dayLoad: dayLoad.length,
         dayBookings: dayLoad,
+        dateOverride: override || null,
       };
     });
 
@@ -149,13 +156,17 @@ const getAvailableStaff = async (req, res, next) => {
     if (!date) return res.status(400).json({ success: false, message: 'Date is required' });
 
     const dayOfWeek = new Date(date).getDay();
+    const dateStr = new Date(date).toDateString();
     const startOfDay = new Date(date); startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date); endOfDay.setHours(23, 59, 59, 999);
 
-    const allStaff = await Staff.find({
-      isActive: true,
-      'availability.dayOfWeek': dayOfWeek,
-      'availability.isAvailable': true,
+    const allStaff = await Staff.find({ isActive: true });
+
+    // Filter by availability, date overrides take priority over day-of-week
+    const workingStaff = allStaff.filter((s) => {
+      const override = s.dateOverrides?.find((o) => new Date(o.date).toDateString() === dateStr);
+      if (override !== undefined) return override.isAvailable;
+      return s.availability?.some((a) => a.dayOfWeek === dayOfWeek && a.isAvailable);
     });
 
     const bookedIds = await Booking.distinct('assignedStaff', {
@@ -163,7 +174,7 @@ const getAvailableStaff = async (req, res, next) => {
       status: { $nin: ['cancelled'] },
     });
 
-    const available = allStaff.filter(
+    const available = workingStaff.filter(
       (s) => !bookedIds.some((id) => id && id.toString() === s._id.toString())
     );
 

@@ -63,12 +63,17 @@ const createBooking = async (req, res, next) => {
       status: { $nin: ['cancelled'] },
     });
 
-    const availableStaff = await Staff.findOne({
+    // Fetch all unbooked active staff, then filter respecting date overrides
+    const unbookedStaff = await Staff.find({
       isActive: true,
-      'availability.dayOfWeek': dayOfWeek,
-      'availability.isAvailable': true,
       _id: { $nin: bookedStaffIds.filter(Boolean) },
     });
+    const dateStr = new Date(scheduledDate).toDateString();
+    const availableStaff = unbookedStaff.find((s) => {
+      const override = s.dateOverrides?.find((o) => new Date(o.date).toDateString() === dateStr);
+      if (override !== undefined) return override.isAvailable;
+      return s.availability?.some((a) => a.dayOfWeek === dayOfWeek && a.isAvailable);
+    }) || null;
 
     const booking = await Booking.create({
       customerName, customerEmail, customerPhone,
@@ -318,7 +323,7 @@ const getBooking = async (req, res, next) => {
 // â"€â"€â"€ Update booking â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const updateBooking = async (req, res, next) => {
   try {
-    const allowed = ['status', 'assignedStaff', 'adminNotes', 'workerNotes', 'scheduledDate', 'timeSlot', 'cancellationReason', 'totalAmount', 'basePrice'];
+    const allowed = ['status', 'assignedStaff', 'adminNotes', 'workerNotes', 'scheduledDate', 'timeSlot', 'cancellationReason', 'totalAmount', 'basePrice', 'customerPhone', 'serviceLabel'];
     const updates = {};
     allowed.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
     if (updates.status === 'cancelled') updates.cancelledAt = new Date();

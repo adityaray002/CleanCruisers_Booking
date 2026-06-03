@@ -15,6 +15,18 @@ const availabilitySchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Per-date override: lets admin mark a specific calendar date as available or unavailable,
+// overriding the day-of-week schedule. Used for compensatory days (e.g., took Saturday off
+// but will work next Wednesday which is normally their day off).
+const dateOverrideSchema = new mongoose.Schema(
+  {
+    date: { type: Date, required: true },
+    isAvailable: { type: Boolean, required: true },
+    note: { type: String, maxlength: 200 },
+  },
+  { _id: true }
+);
+
 const staffSchema = new mongoose.Schema(
   {
     name: {
@@ -39,6 +51,7 @@ const staffSchema = new mongoose.Schema(
     },
     specializations: [{ type: String, trim: true }],
     availability: [availabilitySchema],
+    dateOverrides: [dateOverrideSchema],
     isActive: {
       type: Boolean,
       default: true,
@@ -61,12 +74,14 @@ const staffSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Virtual: full availability check
+// Check if staff is available on a given date, respecting date overrides first
 staffSchema.methods.isAvailableOn = function (date) {
-  const dayOfWeek = new Date(date).getDay();
-  const dayAvail = this.availability.find(
-    (a) => a.dayOfWeek === dayOfWeek && a.isAvailable
-  );
+  const d = new Date(date);
+  const dateStr = d.toDateString();
+  const override = this.dateOverrides?.find((o) => new Date(o.date).toDateString() === dateStr);
+  if (override !== undefined) return override.isAvailable;
+  const dayOfWeek = d.getDay();
+  const dayAvail = this.availability.find((a) => a.dayOfWeek === dayOfWeek && a.isAvailable);
   return !!dayAvail;
 };
 

@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarDays, TrendingUp, Users, CheckCircle, Clock, XCircle,
-  ArrowRight, RefreshCw,
+  ArrowRight, RefreshCw, AlertCircle, UserPlus, Contact,
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { bookingsAPI } from '../../utils/api';
+import { bookingsAPI, customersAPI, leadsAPI } from '../../utils/api';
 import { formatCurrency, formatDate, STATUS_CONFIG, SERVICE_ICONS } from '../../utils/helpers';
 
 const PERIOD_OPTIONS = [
@@ -20,16 +20,24 @@ export default function Dashboard() {
   const [recentBookings, setRecentBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('30');
+  const [crmStats, setCrmStats] = useState(null);
+  const [leadStats, setLeadStats] = useState(null);
+  const [topCustomers, setTopCustomers] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [analyticsRes, bookingsRes] = await Promise.all([
+      const [analyticsRes, bookingsRes, crmRes, leadRes] = await Promise.all([
         bookingsAPI.getAnalytics(period),
         bookingsAPI.getAll({ limit: 8, sort: '-createdAt' }),
+        customersAPI.getStats(),
+        leadsAPI.getStats(),
       ]);
       setAnalytics(analyticsRes.data.data);
       setRecentBookings(bookingsRes.data.data);
+      setCrmStats(crmRes.data.data);
+      setTopCustomers(crmRes.data.data.topCustomers || []);
+      setLeadStats(leadRes.data.data);
     } catch (err) {
       console.error('Dashboard fetch failed:', err);
     } finally {
@@ -175,6 +183,106 @@ export default function Dashboard() {
                   </div>
                 ))}
                 {(analytics?.bookingsByService || []).length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">No data yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* CRM Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+            {/* Customer Stats */}
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Customers</h3>
+                <Link to="/admin/customers" className="text-xs text-primary-600 hover:underline flex items-center gap-1">
+                  View all <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Users className="w-4 h-4 text-blue-500" /> Total Customers
+                  </div>
+                  <span className="font-bold text-gray-900">{crmStats?.total ?? '—'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <TrendingUp className="w-4 h-4 text-green-500" /> Repeat Customers
+                  </div>
+                  <span className="font-bold text-green-700">{crmStats?.repeat ?? '—'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <AlertCircle className="w-4 h-4 text-red-400" /> At-Risk (60d)
+                  </div>
+                  <Link to="/admin/customers?atRisk=true" className="font-bold text-red-500 hover:underline">
+                    {crmStats?.inactive ?? '—'}
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Lead Funnel */}
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Lead Funnel</h3>
+                <Link to="/admin/leads" className="text-xs text-primary-600 hover:underline flex items-center gap-1">
+                  View all <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { key: 'new',       label: 'New Enquiry',  color: 'bg-blue-500' },
+                  { key: 'quoted',    label: 'Quote Sent',   color: 'bg-yellow-500' },
+                  { key: 'follow_up', label: 'Follow Up',    color: 'bg-purple-500' },
+                  { key: 'booked',    label: 'Booked',       color: 'bg-green-500' },
+                  { key: 'lost',      label: 'Lost',         color: 'bg-red-400' },
+                ].map((s) => {
+                  const count = leadStats?.byStage?.[s.key] ?? 0;
+                  const total = leadStats?.total || 1;
+                  const pct = Math.round((count / total) * 100);
+                  return (
+                    <div key={s.key}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-500">{s.label}</span>
+                        <span className="font-semibold text-gray-900">{count}</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full ${s.color} rounded-full transition-all duration-500`}
+                          style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Top Customers */}
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Top Customers</h3>
+                <Link to="/admin/customers" className="text-xs text-primary-600 hover:underline flex items-center gap-1">
+                  View all <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {topCustomers.slice(0, 5).map((c, i) => (
+                  <div key={c.phone} className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-xs flex-shrink-0">
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">{c.name}</div>
+                      <div className="text-xs text-gray-400">{c.totalBookings} bookings</div>
+                    </div>
+                    <div className="text-sm font-semibold text-gray-900 flex-shrink-0">
+                      {formatCurrency(c.totalSpend)}
+                    </div>
+                  </div>
+                ))}
+                {!topCustomers.length && (
                   <p className="text-sm text-gray-400 text-center py-4">No data yet</p>
                 )}
               </div>

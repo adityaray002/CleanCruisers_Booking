@@ -17,6 +17,8 @@ import StaffManagement from './pages/admin/StaffManagement';
 import ServiceManagement from './pages/admin/ServiceManagement';
 import NewBooking from './pages/admin/NewBooking';
 import ScheduleView from './pages/admin/ScheduleView';
+import Customers from './pages/admin/Customers';
+import Leads from './pages/admin/Leads';
 
 export default function App() {
   return (
@@ -69,6 +71,15 @@ export default function App() {
               <ServiceManagement />
             </ProtectedRoute>
           }
+        />
+
+        <Route
+          path="/admin/customers"
+          element={<ProtectedRoute><Customers /></ProtectedRoute>}
+        />
+        <Route
+          path="/admin/leads"
+          element={<ProtectedRoute><Leads /></ProtectedRoute>}
         />
 
         {/* Fallback */}

@@ -12,6 +12,7 @@ const {
   sendCustomerBookingUpdate,
   sendCustomerCancellation,
   sendStaffAssignment,
+  sendFeedbackRequest,
 } = require('../utils/notifications');
 
 // â"€â"€â"€ PUBLIC: Customer creates booking via website â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -384,6 +385,14 @@ const updateBooking = async (req, res, next) => {
           return;
         }
 
+        // 1b. Job completed → send feedback request to customer
+        if (updates.status === 'completed' && before.status !== 'completed') {
+          console.log(`[FEEDBACK] Sending feedback request to ${booking.customerPhone}...`);
+          const result = await sendFeedbackRequest(booking);
+          console.log(`[FEEDBACK] Result:`, JSON.stringify(result));
+          return;
+        }
+
         // 2. Worker actually changed → send full new-job briefing to new worker
         if (isNewWorkerAssigned && booking.assignedStaff) {
           await sendWorkerAssignment(booking);
@@ -560,6 +569,9 @@ const clockOut = async (req, res, next) => {
         } catch (e) { console.error('[NOTIF] Overtime alert:', e.message); }
       }
     }
+
+    // Send feedback request to customer on clock-out
+    try { await sendFeedbackRequest(booking); } catch (e) { console.error('[NOTIF] Feedback request:', e.message); }
 
     res.json({
       success: true,

@@ -344,6 +344,39 @@ const sendWorkerManualPing = async (worker, booking, customMessage) => {
   return await sendWhatsApp(worker.phone, message);
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CRM NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Sent automatically when a booking is marked as completed
+const sendFeedbackRequest = async (booking) => {
+  const message =
+    `⭐ *How was your experience?* — ${SERVICE_NAME}\n\n` +
+    `Hi ${booking.customerName},\n\n` +
+    `Thank you for choosing us! We hope your *${booking.serviceLabel}* was up to the mark. 🧹✨\n\n` +
+    `Could you reply with a quick rating?\n\n` +
+    `⭐ — Poor\n` +
+    `⭐⭐ — Average\n` +
+    `⭐⭐⭐ — Good\n` +
+    `⭐⭐⭐⭐ — Very Good\n` +
+    `⭐⭐⭐⭐⭐ — Excellent!\n\n` +
+    `Your feedback helps us serve you better. 🙏\n\n` +
+    `To book again, just WhatsApp us anytime!\n\n_${SERVICE_NAME}_`;
+  return await sendWhatsApp(booking.customerPhone, message);
+};
+
+// Sent to customers who haven't booked in 30+ days (triggered by cron job)
+const sendWinBackMessage = async (customer) => {
+  const message =
+    `👋 *We miss you!* — ${SERVICE_NAME}\n\n` +
+    `Hi ${customer.name},\n\n` +
+    `It's been a while since your last clean with us. 🧹\n\n` +
+    `Ready to book again? We'd love to have you back!\n\n` +
+    `Just reply to this message or WhatsApp us to schedule your next service.\n\n` +
+    `_${SERVICE_NAME}_`;
+  return await sendWhatsApp(customer.phone, message);
+};
+
 // ─── Legacy alias ─────────────────────────────────────────────────────────────
 const sendStaffAssignment = sendWorkerAssignment;
 
@@ -360,5 +393,7 @@ module.exports = {
   sendWorkerDaySchedule,
   sendWorkerManualPing,
   sendStaffAssignment,
+  sendFeedbackRequest,
+  sendWinBackMessage,
   sendNotification: sendWhatsApp,
 };

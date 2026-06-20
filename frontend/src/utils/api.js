@@ -89,4 +89,19 @@ export const paymentsAPI = {
   verify: (data) => api.post('/payments/verify', data),
 };
 
+export const customersAPI = {
+  getAll: (params) => api.get('/customers', { params }),
+  getOne: (phone) => api.get(`/customers/${phone}`),
+  update: (phone, data) => api.put(`/customers/${phone}`, data),
+  getStats: () => api.get('/customers/stats'),
+};
+
+export const leadsAPI = {
+  getAll: (params) => api.get('/leads', { params }),
+  create: (data) => api.post('/leads', data),
+  update: (id, data) => api.put(`/leads/${id}`, data),
+  delete: (id) => api.delete(`/leads/${id}`),
+  getStats: () => api.get('/leads/stats'),
+};
+
 export default api;

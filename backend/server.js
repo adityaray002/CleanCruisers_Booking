@@ -18,6 +18,7 @@ const slotRoutes = require('./src/routes/slots');
 const serviceRoutes = require('./src/routes/services');
 const customerRoutes = require('./src/routes/customers');
 const leadRoutes = require('./src/routes/leads');
+const webhookRoutes = require('./src/routes/webhook');
 
 const app = express();
 
@@ -82,6 +83,7 @@ app.use('/api/slots', slotRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/webhook/whatsapp', webhookRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

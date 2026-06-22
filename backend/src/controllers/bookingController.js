@@ -1,7 +1,7 @@
 ﻿const Booking = require('../models/Booking');
 const Staff = require('../models/Staff');
 const Service = require('../models/Service');
-const { isSlotAvailable, isValidBookingDate, TIME_SLOTS } = require('../utils/slotManager');
+const { isSlotAvailable, isValidBookingDate, TIME_SLOTS, getWorkersAvailableForSlot } = require('../utils/slotManager');
 const {
   sendBookingConfirmation,
   sendWorkerAssignment,
@@ -55,26 +55,40 @@ const createBooking = async (req, res, next) => {
     const basePrice = service.price;
     const totalAmount = basePrice + addOnPrice;
 
-    const dayOfWeek = new Date(scheduledDate).getDay();
     const { startOfDay, endOfDay } = getDayRange(scheduledDate);
 
-    const bookedStaffIds = await Booking.distinct('assignedStaff', {
-      scheduledDate: { $gte: startOfDay, $lte: endOfDay },
-      timeSlot,
-      status: { $nin: ['cancelled'] },
-    });
+    // Get all workers free for this specific slot (day-available AND not already booked)
+    const freeWorkers = await getWorkersAvailableForSlot(scheduledDate, timeSlot);
 
-    // Fetch all unbooked active staff, then filter respecting date overrides
-    const unbookedStaff = await Staff.find({
-      isActive: true,
-      _id: { $nin: bookedStaffIds.filter(Boolean) },
-    });
-    const dateStr = new Date(scheduledDate).toDateString();
-    const availableStaff = unbookedStaff.find((s) => {
-      const override = s.dateOverrides?.find((o) => new Date(o.date).toDateString() === dateStr);
-      if (override !== undefined) return override.isAvailable;
-      return s.availability?.some((a) => a.dayOfWeek === dayOfWeek && a.isAvailable);
-    }) || null;
+    // Smart assignment: prefer workers whose specializations match the service,
+    // then pick the one with fewest bookings today (load balancing)
+    let availableStaff = null;
+    if (freeWorkers.length > 0) {
+      const serviceLabel = service.name?.toLowerCase() || '';
+
+      const withLoad = await Promise.all(
+        freeWorkers.map(async (w) => {
+          const todayCount = await Booking.countDocuments({
+            assignedStaff: w._id,
+            scheduledDate: { $gte: startOfDay, $lte: endOfDay },
+            status: { $nin: ['cancelled'] },
+          });
+          const specialMatch = w.specializations?.some((sp) =>
+            serviceLabel.includes(sp.toLowerCase())
+          ) ? 0 : 1;
+          return { worker: w, todayCount, specialMatch };
+        })
+      );
+
+      // Sort: specialization match first, then fewest bookings today
+      withLoad.sort((a, b) =>
+        a.specialMatch !== b.specialMatch
+          ? a.specialMatch - b.specialMatch
+          : a.todayCount - b.todayCount
+      );
+
+      availableStaff = withLoad[0].worker;
+    }
 
     const booking = await Booking.create({
       customerName, customerEmail, customerPhone,

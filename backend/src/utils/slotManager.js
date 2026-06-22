@@ -1,6 +1,6 @@
 const Booking = require('../models/Booking');
+const Staff = require('../models/Staff');
 
-// Available time slots
 const TIME_SLOTS = [
   '08:00 AM - 10:00 AM',
   '10:00 AM - 12:00 PM',
@@ -10,24 +10,54 @@ const TIME_SLOTS = [
   '06:00 PM - 08:00 PM',
 ];
 
-// Max bookings per slot per day
-const MAX_BOOKINGS_PER_SLOT = 3;
+const getDayBounds = (date) => {
+  const start = new Date(date); start.setHours(0, 0, 0, 0);
+  const end   = new Date(date); end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
 
-/**
- * Get available slots for a given date
- */
-const getAvailableSlots = async (date) => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+// Workers available for a given calendar day (respects date overrides + day-of-week schedule)
+const getWorkersAvailableForDay = async (date) => {
+  const dayOfWeek = new Date(date).getDay();
+  const dateStr   = new Date(date).toDateString();
+  const staff     = await Staff.find({ isActive: true }).lean();
 
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  return staff.filter((s) => {
+    const override = s.dateOverrides?.find((o) => new Date(o.date).toDateString() === dateStr);
+    if (override !== undefined) return override.isAvailable;
+    return s.availability?.some((a) => a.dayOfWeek === dayOfWeek && a.isAvailable);
+  });
+};
 
-  // Get all active bookings for the day
-  const existingBookings = await Booking.find({
-    scheduledDate: { $gte: startOfDay, $lte: endOfDay },
+// Workers available for a specific slot — day-available AND not already booked in that slot
+const getWorkersAvailableForSlot = async (date, timeSlot) => {
+  const { start, end } = getDayBounds(date);
+
+  const dayWorkers = await getWorkersAvailableForDay(date);
+  if (!dayWorkers.length) return [];
+
+  const bookedIds = await Booking.distinct('assignedStaff', {
+    scheduledDate: { $gte: start, $lte: end },
+    timeSlot,
     status: { $nin: ['cancelled'] },
-  }).select('timeSlot');
+    assignedStaff: { $ne: null },
+  });
+
+  const bookedSet = new Set(bookedIds.map((id) => id?.toString()).filter(Boolean));
+  return dayWorkers.filter((w) => !bookedSet.has(w._id.toString()));
+};
+
+// All 6 slots with worker-aware availability for a given date
+const getAvailableSlots = async (date) => {
+  const { start, end } = getDayBounds(date);
+
+  const dayWorkers = await getWorkersAvailableForDay(date);
+  const workerCapacity = dayWorkers.length;
+
+  const existingBookings = await Booking.find({
+    scheduledDate: { $gte: start, $lte: end },
+    status: { $nin: ['cancelled'] },
+  }).select('timeSlot assignedStaff');
 
   // Count bookings per slot
   const slotCounts = {};
@@ -35,69 +65,60 @@ const getAvailableSlots = async (date) => {
     slotCounts[b.timeSlot] = (slotCounts[b.timeSlot] || 0) + 1;
   });
 
-  // Build availability response
-  const now = new Date();
-  const isToday = startOfDay.toDateString() === now.toDateString();
+  const now     = new Date();
+  const isToday = start.toDateString() === now.toDateString();
 
   return TIME_SLOTS.map((slot) => {
-    const count = slotCounts[slot] || 0;
-    const isFull = count >= MAX_BOOKINGS_PER_SLOT;
+    const count  = slotCounts[slot] || 0;
+    // Slot is full when every available worker already has a booking in it
+    const maxCapacity = Math.max(workerCapacity, 1);
+    const isFull = count >= maxCapacity;
 
-    // Disable past slots for today
     let isPast = false;
     if (isToday) {
-      const slotHour = parseInt(slot.split(':')[0]);
+      const slotHour = parseInt(slot.split(':')[0], 10);
       isPast = now.getHours() >= slotHour;
     }
 
+    const noWorkers = workerCapacity === 0;
+
     return {
       slot,
-      available: !isFull && !isPast,
+      available: !isFull && !isPast && !noWorkers,
       count,
-      maxCapacity: MAX_BOOKINGS_PER_SLOT,
-      reason: isFull ? 'Slot fully booked' : isPast ? 'Slot has passed' : null,
+      maxCapacity,
+      workersAvailable: Math.max(maxCapacity - count, 0),
+      reason: noWorkers
+        ? 'No staff available today'
+        : isFull
+          ? 'All workers booked for this slot'
+          : isPast
+            ? 'Slot has passed'
+            : null,
     };
   });
 };
 
-/**
- * Check if a specific slot is available
- */
+// Check if a specific slot still has room (at least one free worker)
 const isSlotAvailable = async (date, timeSlot) => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const count = await Booking.countDocuments({
-    scheduledDate: { $gte: startOfDay, $lte: endOfDay },
-    timeSlot,
-    status: { $nin: ['cancelled'] },
-  });
-
-  return count < MAX_BOOKINGS_PER_SLOT;
+  const workers = await getWorkersAvailableForSlot(date, timeSlot);
+  return workers.length > 0;
 };
 
-/**
- * Validate booking date is not in the past and within booking window
- */
 const isValidBookingDate = (date) => {
   const bookingDate = new Date(date);
-  const now = new Date();
-  const maxAdvance = new Date();
-  maxAdvance.setDate(maxAdvance.getDate() + 90); // 90 days in advance
-
-  // At least 2 hours from now
-  const minDate = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-
-  return bookingDate >= minDate && bookingDate <= maxAdvance;
+  const now         = new Date();
+  const minDate     = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hrs ahead
+  const maxDate     = new Date(now);
+  maxDate.setDate(maxDate.getDate() + 90);
+  return bookingDate >= minDate && bookingDate <= maxDate;
 };
 
 module.exports = {
   TIME_SLOTS,
-  MAX_BOOKINGS_PER_SLOT,
   getAvailableSlots,
   isSlotAvailable,
   isValidBookingDate,
+  getWorkersAvailableForDay,
+  getWorkersAvailableForSlot,
 };

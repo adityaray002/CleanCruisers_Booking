@@ -40,7 +40,7 @@ export default function StaffManagement() {
 
   // Date override modal state
   const [overrideMember, setOverrideMember] = useState(null);
-  const [newOverride, setNewOverride] = useState({ date: '', isAvailable: true, note: '' });
+  const [newOverride, setNewOverride] = useState({ date: '', isAvailable: false, note: '' });
   const [savingOverride, setSavingOverride] = useState(false);
 
   const fetchStaff = useCallback(async () => {
@@ -151,7 +151,7 @@ export default function StaffManagement() {
   // ── Date override handlers ────────────────────────────────────────────────
   const openOverrides = (member) => {
     setOverrideMember(member);
-    setNewOverride({ date: '', isAvailable: true, note: '' });
+    setNewOverride({ date: '', isAvailable: false, note: '' });
   };
 
   const addOverride = async () => {
@@ -298,8 +298,8 @@ export default function StaffManagement() {
                 <button onClick={() => openEdit(member)} className="btn-ghost flex-1 text-xs border border-gray-200 justify-center gap-1.5 py-2">
                   <Pencil className="w-3.5 h-3.5" /> Edit
                 </button>
-                <button onClick={() => openOverrides(member)} className="btn-ghost text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 py-2 px-3 gap-1.5" title="Manage compensatory days">
-                  <CalendarClock className="w-3.5 h-3.5" />
+                <button onClick={() => openOverrides(member)} className="btn-ghost text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 py-2 px-3 gap-1.5">
+                  <CalendarClock className="w-3.5 h-3.5" /> Leave
                 </button>
                 {member.isActive && (
                   <button onClick={() => handleDeactivate(member._id)} className="btn-ghost text-xs border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 py-2 px-3 gap-1.5">
@@ -436,8 +436,8 @@ export default function StaffManagement() {
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
               <div>
-                <h3 className="font-semibold text-gray-900">Day Overrides — {overrideMember.name}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Override weekly schedule for specific dates (e.g. compensatory off/work days)</p>
+                <h3 className="font-semibold text-gray-900">Leave / Overrides — {overrideMember.name}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Mark leave days or extra working days. Slot capacity adjusts automatically.</p>
               </div>
               <button onClick={() => setOverrideMember(null)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
                 <X className="w-5 h-5 text-gray-500" />
@@ -465,23 +465,23 @@ export default function StaffManagement() {
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setNewOverride((o) => ({ ...o, isAvailable: true }))}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${newOverride.isAvailable ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-green-400'}`}
-                    >
-                      Available (Compensatory Work)
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setNewOverride((o) => ({ ...o, isAvailable: false }))}
                       className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${!newOverride.isAvailable ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-200 hover:border-red-400'}`}
                     >
-                      Unavailable (Extra Off)
+                      🔴 Mark as Off (Leave)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewOverride((o) => ({ ...o, isAvailable: true }))}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${newOverride.isAvailable ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-green-400'}`}
+                    >
+                      🟢 Mark as Working
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 mt-1.5">
                     {newOverride.isAvailable
                       ? 'Worker will be available on this date even if it\'s their regular day off'
-                      : 'Worker will be unavailable on this date even if it\'s their regular working day'}
+                      : 'Worker will be off on this date — slot capacity will reduce automatically'}
                   </p>
                 </div>
                 <div>

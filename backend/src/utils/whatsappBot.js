@@ -4,43 +4,46 @@ const { sendText, sendButtons, sendList } = require('./metaWhatsApp');
 const { getAvailableSlots } = require('./slotManager');
 
 // ── Business config ───────────────────────────────────────────────────────────
-const BUSINESSES = {
-  [process.env.SOFASHINE_PHONE_NUMBER_ID]: {
-    id:   'sofashine',
-    name: 'SofaShine',
-    token: () => process.env.SOFASHINE_META_TOKEN,
-    services: [
-      { id: 'Sofa Cleaning',     emoji: '🛋️' },
-      { id: 'Carpet Cleaning',   emoji: '🏠' },
-      { id: 'Mattress Cleaning', emoji: '🛏️' },
-      { id: 'Chair Cleaning',    emoji: '🪑' },
+const sofaShineConfig = {
+  id:    'sofashine',
+  name:  'SofaShine',
+  token: () => process.env.SOFASHINE_META_TOKEN,
+  services: [
+    { id: 'Sofa Cleaning',     emoji: '🛋️' },
+    { id: 'Carpet Cleaning',   emoji: '🏠' },
+    { id: 'Mattress Cleaning', emoji: '🛏️' },
+    { id: 'Chair Cleaning',    emoji: '🪑' },
+  ],
+  subServices: {
+    'Sofa Cleaning':     [
+      { id: '2 Seater',  price: 499  },
+      { id: '3 Seater',  price: 699  },
+      { id: 'L-Shape',   price: 999  },
     ],
-    subServices: {
-      'Sofa Cleaning':     [
-        { id: '2 Seater',  price: 499  },
-        { id: '3 Seater',  price: 699  },
-        { id: 'L-Shape',   price: 999  },
-      ],
-      'Carpet Cleaning':   [
-        { id: 'Small (up to 4x6 ft)',   price: 499  },
-        { id: 'Medium (up to 6x9 ft)',  price: 799  },
-        { id: 'Large (above 6x9 ft)',   price: 1199 },
-      ],
-      'Mattress Cleaning': [
-        { id: 'Single Mattress', price: 399 },
-        { id: 'Double Mattress', price: 599 },
-        { id: 'King Size',       price: 799 },
-      ],
-      'Chair Cleaning':    [
-        { id: '1 Chair',  price: 299 },
-        { id: '2 Chairs', price: 499 },
-        { id: '4 Chairs', price: 799 },
-      ],
-    },
+    'Carpet Cleaning':   [
+      { id: 'Small (up to 4x6 ft)',   price: 499  },
+      { id: 'Medium (up to 6x9 ft)',  price: 799  },
+      { id: 'Large (above 6x9 ft)',   price: 1199 },
+    ],
+    'Mattress Cleaning': [
+      { id: 'Single Mattress', price: 399 },
+      { id: 'Double Mattress', price: 599 },
+      { id: 'King Size',       price: 799 },
+    ],
+    'Chair Cleaning':    [
+      { id: '1 Chair',  price: 299 },
+      { id: '2 Chairs', price: 499 },
+      { id: '4 Chairs', price: 799 },
+    ],
   },
+};
+
+const BUSINESSES = {
+  [process.env.SOFASHINE_PHONE_NUMBER_ID]: sofaShineConfig,
+  '1245560968629574': sofaShineConfig, // Meta test number (Step 1 try it out)
   [process.env.CLEANCRUISERS_PHONE_NUMBER_ID]: {
-    id:   'cleancruisers',
-    name: 'CleanCruisers',
+    id:    'cleancruisers',
+    name:  'CleanCruisers',
     token: () => process.env.CLEANCRUISERS_META_TOKEN,
     services: [
       { id: 'One-Time Wash',    emoji: '🚗' },

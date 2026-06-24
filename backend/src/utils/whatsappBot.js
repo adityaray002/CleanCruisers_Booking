@@ -155,7 +155,7 @@ const askSubService = async (to, biz, service, phoneNumberId, token) => {
     description: `₹${s.price}`,
   }));
   await sendList(to,
-    `🧹 *${service}*\n\nApna option choose karein 👇\n_(Prices estimated hain — final on-site confirm hoga)_`,
+    `🧹 *${service}*\n\nApna option choose karein 👇`,
     'Option Chunein',
     [{ title: service, rows }],
     phoneNumberId,
@@ -257,7 +257,6 @@ const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
     `👤 *Name:* ${data.name}\n` +
     (total > 0 ? `💰 *Total Estimated:* ₹${total}\n` : '') +
     `━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Final amount on-site confirm hoga._\n\n` +
     `Sab sahi hai? Confirm karein 👇`;
 
   await sendButtons(to, summary,
@@ -276,8 +275,7 @@ const sendBookingDone = async (to, name, bizName, phoneNumberId, token, data = {
       `📅 ${fmtDate(data.date)}\n` +
       `🕐 ${data.timeSlot}\n` +
       `💰 Estimated: ₹${data.quotedAmount}\n` +
-      `📍 ${data.address}\n\n` +
-      `_Final amount on-site verify hoga._\n\n`
+      `📍 ${data.address}\n\n`
     : '';
   await sendText(to,
     `🎉 *Shukriya, ${name}! Booking mili!*\n\n` +

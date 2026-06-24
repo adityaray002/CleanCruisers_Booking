@@ -96,6 +96,14 @@ const createWebsiteLead = async (req, res, next) => {
   }
 };
 
+// Normalize Indian phone numbers to WhatsApp format (e.g. 9XXXXXXXXX → 919XXXXXXXXX)
+const normalizePhone = (phone) => {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith('0')) return `91${digits.slice(1)}`;
+  return digits;
+};
+
 const confirmLead = async (req, res, next) => {
   try {
     const lead = await Lead.findById(req.params.id);
@@ -104,13 +112,16 @@ const confirmLead = async (req, res, next) => {
     lead.stage = 'booked';
     await lead.save();
 
-    // Send WhatsApp confirmation to customer
+    let whatsappSent = false;
+    let whatsappError = null;
+
     if (lead.phone) {
       const { sendText } = require('../utils/metaWhatsApp');
       const phoneNumberId = process.env.SOFASHINE_PHONE_NUMBER_ID;
       const token         = process.env.SOFASHINE_META_TOKEN;
 
       if (phoneNumberId && token) {
+        const toPhone = normalizePhone(lead.phone);
         const msg =
           `✅ *Booking Confirmed!*\n\n` +
           `Namaste *${lead.name}*! 🙏\n\n` +
@@ -122,12 +133,18 @@ const confirmLead = async (req, res, next) => {
           `Koi sawaal ho toh hume yahan message karein. 🙏\n\n` +
           `_Thank you for choosing SofaShine!_`;
 
-        sendText(lead.phone, msg, phoneNumberId, token)
-          .catch((err) => console.error('[CONFIRM] WhatsApp send failed:', err.message));
+        try {
+          await sendText(toPhone, msg, phoneNumberId, token);
+          whatsappSent = true;
+        } catch (err) {
+          const errData = err.response?.data?.error;
+          whatsappError = errData?.message || err.message;
+          console.error(`[CONFIRM] WhatsApp send failed to ${toPhone}:`, errData || err.message);
+        }
       }
     }
 
-    res.json({ success: true, data: lead });
+    res.json({ success: true, data: lead, whatsappSent, whatsappError });
   } catch (err) {
     next(err);
   }

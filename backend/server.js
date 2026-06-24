@@ -26,6 +26,10 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
+// Trust Render's proxy so express-rate-limit can read the real client IP
+// from X-Forwarded-For without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 // Accept comma-separated list of allowed origins
@@ -46,13 +50,13 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
+// Rate limiting — webhook is excluded (Meta's servers must never be rate-limited)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   message: { success: false, message: 'Too many requests, please try again later.' },
 });
-app.use('/api/', limiter);
+app.use(/^\/api\/(?!webhook).*/, limiter);
 
 // Strict limiter for auth routes
 const authLimiter = rateLimit({

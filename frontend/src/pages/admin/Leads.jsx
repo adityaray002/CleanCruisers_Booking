@@ -226,9 +226,18 @@ export default function Leads() {
 
   const handleConfirm = async (id) => {
     try {
-      await leadsAPI.confirm(id);
+      const res = await leadsAPI.confirm(id);
       setLeads((prev) => prev.map((l) => l._id === id ? { ...l, stage: 'booked' } : l));
-      toast.success('Booking confirmed! WhatsApp sent to customer.');
+      if (res.data.whatsappSent) {
+        toast.success('Booking confirmed! WhatsApp message sent to customer.');
+      } else {
+        toast.success('Booking confirmed!');
+        toast('WhatsApp message could not be sent. Ask the customer to message you on WhatsApp first, then try again.', {
+          icon: '⚠️',
+          duration: 6000,
+          style: { background: '#fff3cd', color: '#7d5a00', maxWidth: '380px' },
+        });
+      }
     } catch {
       toast.error('Failed to confirm booking');
     }

@@ -13,6 +13,7 @@ const sofaShineConfig = {
     { id: 'Deep Cleaning',      emoji: '🏠' },
     { id: 'Appliance Cleaning', emoji: '🔧' },
     { id: 'Pest Control',       emoji: '🐜' },
+    { id: 'Other / Custom',     emoji: '💬' },
   ],
   subServices: {
     'Home Cleaning': [
@@ -216,6 +217,15 @@ const askName = async (to, phoneNumberId, token) => {
   );
 };
 
+const askCustomRequest = async (to, phoneNumberId, token) => {
+  await sendText(to,
+    `💬 *Aapko kya chahiye?*\n\n` +
+    `Apni requirement detail mein type karein 📝\n\n` +
+    `_Jaise: "Curtain cleaning", "3 BHK full clean", "AC servicing × 2" etc._`,
+    phoneNumberId, token
+  );
+};
+
 const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
   const summary =
     `🧾 *Booking Details — ${bizName}*\n` +
@@ -308,8 +318,32 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         stage: 'new',
         notes: 'WhatsApp bot — conversation in progress',
       });
+      // Custom request — skip sub-service list, ask them to describe
+      if (match.id === 'Other / Custom') {
+        await save(conv, 'AWAITING_CUSTOM_REQUEST', { service: match.id, leadId: partialLead._id.toString() });
+        await askCustomRequest(from, phoneNumberId, token);
+        break;
+      }
       await save(conv, 'AWAITING_SUBSERVICE', { service: match.id, leadId: partialLead._id.toString() });
       await askSubService(from, biz, match.id, phoneNumberId, token);
+      break;
+    }
+
+    case 'AWAITING_CUSTOM_REQUEST': {
+      if (text.trim().length < 3) {
+        await sendText(from, '⚠️ Thoda detail mein batayein please 🙏', phoneNumberId, token);
+        break;
+      }
+      const customDesc = text.trim();
+      if (conv.data.leadId) {
+        await Lead.findByIdAndUpdate(conv.data.leadId, {
+          serviceInterest: customDesc,
+          notes: `Custom request: ${customDesc}`,
+        });
+      }
+      await save(conv, 'AWAITING_DATE', { subService: customDesc, quotedAmount: 0 });
+      await sendText(from, `✅ *Got it!* "${customDesc}"\n\nAb date select karein 👇`, phoneNumberId, token);
+      await askDate(from, phoneNumberId, token);
       break;
     }
 

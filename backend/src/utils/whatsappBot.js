@@ -153,8 +153,8 @@ const askSubService = async (to, biz, service, phoneNumberId, token) => {
     description: `₹${s.price}`,
   }));
   await sendList(to,
-    `*${service}* ke liye konsa option chahiye?`,
-    'Option select karo',
+    `🧹 *${service}*\n\nApna option choose karein 👇\n_(Prices estimated hain — final on-site confirm hoga)_`,
+    'Option Chunein',
     [{ title: service, rows }],
     phoneNumberId,
     token
@@ -163,40 +163,37 @@ const askSubService = async (to, biz, service, phoneNumberId, token) => {
 
 const askDate = async (to, phoneNumberId, token) => {
   await sendButtons(to,
-    '📅 Kab chahiye service?',
+    `📅 *Kab chahiye service?*\n\n` +
+    `Neeche se select karein 👇\n` +
+    `_(Koi aur date? Type karein: DD/MM/YYYY — jaise 28/06/2025)_`,
     [
-      { id: 'aaj',    title: '⚡ Aaj' },
-      { id: 'kal',    title: '🌅 Kal' },
+      { id: 'aaj',    title: '⚡ Aaj (Today)' },
+      { id: 'kal',    title: '🌅 Kal (Tomorrow)' },
       { id: 'parson', title: '📆 Parson' },
     ],
     phoneNumberId, token
   );
-  await sendText(to, 'Ya koi aur date type karein — DD/MM/YYYY format mein (jaise 25/06/2025)', phoneNumberId, token);
 };
 
 const askTime = async (to, date, phoneNumberId, token) => {
-  const slots   = await getAvailableSlots(date);
-  const avail   = slots.filter((s) => s.available);
+  const slots = await getAvailableSlots(date);
+  const avail = slots.filter((s) => s.available);
 
   if (!avail.length) {
-    await sendText(to, `😔 ${fmtDate(date)} ke liye koi slot available nahi hai.\n\nKoi aur date select karein:`, phoneNumberId, token);
-    await sendButtons(to, 'Date select karo:',
+    await sendButtons(to,
+      `😔 *${fmtDate(date)}* ke liye koi slot available nahi hai.\n\nKoi aur date try karein 👇`,
       [{ id: 'kal', title: '🌅 Kal' }, { id: 'parson', title: '📆 Parson' }, { id: 'other_date', title: '📆 Aur date' }],
       phoneNumberId, token
     );
     return false;
   }
 
-  const rows = avail.map((s) => ({
-    id:          s.slot,
-    title:       s.slot,
-    description: `${s.workersAvailable} worker${s.workersAvailable !== 1 ? 's' : ''} available`,
-  }));
+  const rows = avail.map((s) => ({ id: s.slot, title: s.slot }));
 
   await sendList(to,
-    `🕐 *${fmtDate(date)}* ke liye available slots:`,
-    'Slot select karo',
-    [{ title: 'Time Slots', rows }],
+    `🕐 *${fmtDate(date)}* ke liye available time slots:\n\nApna preferred time choose karein 👇`,
+    'Time Slot Chunein',
+    [{ title: '⏰ Available Slots', rows }],
     phoneNumberId, token
   );
   return true;
@@ -204,29 +201,39 @@ const askTime = async (to, date, phoneNumberId, token) => {
 
 const askAddress = async (to, phoneNumberId, token) => {
   await sendText(to,
-    '📍 Apna *complete address* bhejein\n\nYa location pin share karein 📌\n\n_(Ghar no., gali, area, landmark — sab likho)_',
+    `📍 *Aapka address kya hai?*\n\n` +
+    `Poora address likhein:\n` +
+    `Flat/Ghar no. → Gali/Society → Area → City\n\n` +
+    `_(Ya location pin share karein 📌)_`,
     phoneNumberId, token
   );
 };
 
 const askName = async (to, phoneNumberId, token) => {
-  await sendText(to, '👤 Aapka naam kya hai?', phoneNumberId, token);
+  await sendText(to,
+    `👤 *Aakhri step! Aapka naam kya hai?*\n\n_(Jaise: Rahul Sharma)_`,
+    phoneNumberId, token
+  );
 };
 
 const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
   const summary =
-    `✅ *Booking Summary — ${bizName}*\n\n` +
-    `🧹 Service: ${data.service} — ${data.subService}\n` +
-    `📅 Date: ${fmtDate(data.date)}\n` +
-    `🕐 Time: ${data.timeSlot}\n` +
-    `📍 Address: ${data.address}\n` +
-    `👤 Name: ${data.name}\n` +
-    `💰 Amount: ₹${data.quotedAmount}\n\n` +
-    `_Amount on-site verify hoga — yeh estimated price hai._`;
+    `🧾 *Booking Details — ${bizName}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `🧹 *Service:* ${data.service}\n` +
+    `   └ ${data.subService}\n` +
+    `📅 *Date:* ${fmtDate(data.date)}\n` +
+    `🕐 *Time:* ${data.timeSlot}\n` +
+    `📍 *Address:* ${data.address}\n` +
+    `👤 *Name:* ${data.name}\n` +
+    `💰 *Estimated:* ₹${data.quotedAmount}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Final amount on-site confirm hoga._\n\n` +
+    `Sab sahi hai? Confirm karein 👇`;
 
   await sendButtons(to, summary,
     [
-      { id: 'CONFIRM_YES', title: '✅ Confirm' },
+      { id: 'CONFIRM_YES', title: '✅ Confirm Booking' },
       { id: 'CONFIRM_NO',  title: '❌ Cancel' },
     ],
     phoneNumberId, token

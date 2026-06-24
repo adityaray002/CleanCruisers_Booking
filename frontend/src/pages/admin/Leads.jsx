@@ -325,6 +325,41 @@ export default function Leads() {
   const handleStageChange = async (id, stage) => {
     if (stage === 'booked') {
       const lead = leads.find((l) => l._id === id);
+
+      // Booking already created — just update stage
+      if (lead.convertedBookingId) {
+        try {
+          await leadsAPI.update(id, { stage: 'booked' });
+          setLeads((prev) => prev.map((l) => l._id === id ? { ...l, stage: 'booked' } : l));
+          toast.success('Stage updated to Booked');
+        } catch {
+          toast.error('Failed to update stage');
+        }
+        return;
+      }
+
+      // All scheduling data present — auto-create booking silently
+      if (lead.scheduledDate && lead.timeSlot && lead.address) {
+        try {
+          const res = await leadsAPI.convert(id, {
+            scheduledDate: lead.scheduledDate,
+            timeSlot:      lead.timeSlot,
+            address:       lead.address,
+          });
+          setLeads((prev) => prev.map((l) =>
+            l._id === id
+              ? { ...l, stage: 'booked', convertedBookingId: res.data.data.booking._id }
+              : l
+          ));
+          toast.success(`✅ Booking ${res.data.data.booking.bookingId} created & scheduled!`);
+          fetchData();
+        } catch {
+          toast.error('Failed to create booking');
+        }
+        return;
+      }
+
+      // Missing data — show modal so admin can fill in date/time/address
       setBookingModal(lead);
       return;
     }

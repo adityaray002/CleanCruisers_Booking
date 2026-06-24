@@ -19,6 +19,7 @@ import NewBooking from './pages/admin/NewBooking';
 import ScheduleView from './pages/admin/ScheduleView';
 import Customers from './pages/admin/Customers';
 import Leads from './pages/admin/Leads';
+import Subscriptions from './pages/admin/Subscriptions';
 
 export default function App() {
   return (
@@ -80,6 +81,10 @@ export default function App() {
         <Route
           path="/admin/leads"
           element={<ProtectedRoute><Leads /></ProtectedRoute>}
+        />
+        <Route
+          path="/admin/subscriptions"
+          element={<ProtectedRoute><Subscriptions /></ProtectedRoute>}
         />
 
         {/* Fallback */}

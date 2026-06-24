@@ -270,7 +270,16 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         await askService(from, biz, token);
         break;
       }
-      await save(conv, 'AWAITING_SUBSERVICE', { service: match.id });
+      // Create partial lead immediately so drop-offs are visible to admin
+      const partialLead = await Lead.create({
+        name: 'Incomplete',
+        phone: from,
+        serviceInterest: match.id,
+        source: 'whatsapp',
+        stage: 'new',
+        notes: 'WhatsApp bot — conversation in progress',
+      });
+      await save(conv, 'AWAITING_SUBSERVICE', { service: match.id, leadId: partialLead._id.toString() });
       await askSubService(from, biz, match.id, phoneNumberId, token);
       break;
     }
@@ -341,22 +350,27 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
     case 'AWAITING_CONFIRM': {
       if (text === 'CONFIRM_YES' || text.toLowerCase() === 'confirm' || text === '1') {
-        // Create lead in DB
-        await Lead.create({
+        const leadData = {
           name:            conv.data.name,
-          phone:           from,
           serviceInterest: `${conv.data.service} — ${conv.data.subService}`,
           quotedAmount:    conv.data.quotedAmount,
           notes:           `Date: ${fmtDate(conv.data.date)}\nTime: ${conv.data.timeSlot}\nAddress: ${conv.data.address}`,
-          source:          'whatsapp',
           stage:           'new',
-        });
+        };
+        if (conv.data.leadId) {
+          await Lead.findByIdAndUpdate(conv.data.leadId, leadData);
+        } else {
+          await Lead.create({ ...leadData, phone: from, source: 'whatsapp' });
+        }
 
         await save(conv, 'COMPLETED');
         await sendBookingDone(from, conv.data.name, biz.name, phoneNumberId, token);
-        console.log(`[BOT] ✅ Lead created — ${conv.data.name} (${from}) — ${biz.name}`);
+        console.log(`[BOT] ✅ Lead confirmed — ${conv.data.name} (${from}) — ${biz.name}`);
 
       } else if (text === 'CONFIRM_NO' || text.toLowerCase() === 'cancel' || text === '2') {
+        if (conv.data.leadId) {
+          await Lead.findByIdAndUpdate(conv.data.leadId, { stage: 'lost', notes: 'Customer cancelled during WhatsApp booking' });
+        }
         await Conversation.deleteOne({ _id: conv._id });
         await sendText(from, '❌ Booking cancel kar di gayi. Dobara book karne ke liye "Hi" likhein.', phoneNumberId, token);
 

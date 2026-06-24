@@ -114,8 +114,19 @@ function AddLeadModal({ onClose, onSaved }) {
 }
 
 // ─── Lead Card ────────────────────────────────────────────────────────────────
-function LeadCard({ lead, onStageChange, onDelete }) {
+function LeadCard({ lead, onStageChange, onDelete, onConfirm }) {
+  const [confirming, setConfirming] = React.useState(false);
   const cfg = stageConfig[lead.stage];
+
+  const handleConfirm = async () => {
+    if (!window.confirm(`Confirm booking for ${lead.name}? WhatsApp confirmation will be sent.`)) return;
+    setConfirming(true);
+    try {
+      await onConfirm(lead._id);
+    } finally {
+      setConfirming(false);
+    }
+  };
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -150,6 +161,16 @@ function LeadCard({ lead, onStageChange, onDelete }) {
         </span>
         <span className="text-xs text-gray-300 ml-auto">{lead.source}</span>
       </div>
+
+      {lead.source === 'whatsapp' && lead.stage !== 'booked' && lead.stage !== 'lost' && (
+        <button
+          onClick={handleConfirm}
+          disabled={confirming}
+          className="mt-2 w-full text-xs bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-semibold py-1.5 rounded-lg transition-colors"
+        >
+          {confirming ? 'Sending...' : '✅ Confirm & Notify Customer'}
+        </button>
+      )}
 
       <select
         value={lead.stage}
@@ -200,6 +221,16 @@ export default function Leads() {
       toast.success('Stage updated');
     } catch {
       toast.error('Failed to update');
+    }
+  };
+
+  const handleConfirm = async (id) => {
+    try {
+      await leadsAPI.confirm(id);
+      setLeads((prev) => prev.map((l) => l._id === id ? { ...l, stage: 'booked' } : l));
+      toast.success('Booking confirmed! WhatsApp sent to customer.');
+    } catch {
+      toast.error('Failed to confirm booking');
     }
   };
 
@@ -270,6 +301,7 @@ export default function Leads() {
                     lead={lead}
                     onStageChange={handleStageChange}
                     onDelete={handleDelete}
+                    onConfirm={handleConfirm}
                   />
                 ))}
                 {leadsByStage(stage.key).length === 0 && (

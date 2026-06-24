@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, CalendarDays, Users, LogOut, Menu, X, Sparkles, ChevronRight, Wrench, PlusCircle, Grid3x3, Contact, UserPlus,
+  LayoutDashboard, CalendarDays, Users, LogOut, Menu, X, Sparkles, ChevronRight, Wrench, PlusCircle, Grid3x3, Contact, UserPlus, Repeat2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/admin/services', icon: Wrench, label: 'Services' },
   { to: '/admin/customers', icon: Contact, label: 'Customers' },
   { to: '/admin/leads', icon: UserPlus, label: 'Leads' },
+  { to: '/admin/subscriptions', icon: Repeat2, label: 'Subscriptions' },
 ];
 
 export default function AdminLayout({ children, title }) {

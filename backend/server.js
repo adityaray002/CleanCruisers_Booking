@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 
 const connectDB = require('./src/config/database');
 const errorHandler = require('./src/middleware/errorHandler');
-const { winBackJob, reminderJob } = require('./src/utils/cronJobs');
+const { winBackJob, reminderJob, subscriptionJob } = require('./src/utils/cronJobs');
 
 // Route imports
 const authRoutes = require('./src/routes/auth');
@@ -18,6 +18,7 @@ const slotRoutes = require('./src/routes/slots');
 const serviceRoutes = require('./src/routes/services');
 const customerRoutes = require('./src/routes/customers');
 const leadRoutes = require('./src/routes/leads');
+const subscriptionRoutes = require('./src/routes/subscriptions');
 const webhookRoutes = require('./src/routes/webhook');
 
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api/slots', slotRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/webhook/whatsapp', webhookRoutes);
 
 // 404 handler
@@ -98,7 +100,7 @@ const server = app.listen(PORT, () => {
   console.log(`\n🚀 CleanCruisers API running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 CORS origin: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-  console.log(`⏰ Cron jobs: win-back @ 10:00 AM IST | reminders @ 8:00 AM IST\n`);
+  console.log(`⏰ Cron jobs: win-back @ 10AM | reminders @ 8AM | subscriptions @ 9AM IST\n`);
 });
 
 // Keep-alive ping — prevents Render free tier from sleeping

@@ -102,6 +102,16 @@ export const leadsAPI = {
   update: (id, data) => api.put(`/leads/${id}`, data),
   delete: (id) => api.delete(`/leads/${id}`),
   getStats: () => api.get('/leads/stats'),
+  confirm: (id) => api.post(`/leads/${id}/confirm`),
+};
+
+export const subscriptionsAPI = {
+  getAll: (params) => api.get('/subscriptions', { params }),
+  create: (data) => api.post('/subscriptions', data),
+  update: (id, data) => api.put(`/subscriptions/${id}`, data),
+  delete: (id) => api.delete(`/subscriptions/${id}`),
+  getStats: () => api.get('/subscriptions/stats'),
+  checkConflict: (date, timeSlot) => api.get('/subscriptions/check-conflict', { params: { date, timeSlot } }),
 };
 
 export default api;

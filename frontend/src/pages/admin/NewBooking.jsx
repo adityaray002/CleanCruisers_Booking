@@ -8,7 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import AdminLayout from '../../components/AdminLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { bookingsAPI, staffAPI } from '../../utils/api';
+import { bookingsAPI, staffAPI, subscriptionsAPI } from '../../utils/api';
 import { formatCurrency, formatDate, INDIAN_STATES } from '../../utils/helpers';
 
 // Quick 1-hour preset slots the admin can tap to auto-fill the time pickers
@@ -99,6 +99,7 @@ export default function NewBooking() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [draftRestored, setDraftRestored] = useState(false);
+  const [subConflicts, setSubConflicts] = useState([]);
 
   // ── On mount: restore draft (if any) then apply URL overrides ───────────────
   useEffect(() => {
@@ -141,13 +142,19 @@ export default function NewBooking() {
     setErrors((e) => ({ ...e, timeSlot: undefined }));
   }, [startTime, endTime]);
 
-  // Fetch staff availability whenever date + timeSlot change
+  // Fetch staff availability + subscription conflict check whenever date + timeSlot change
   useEffect(() => {
-    if (!form.scheduledDate || !form.timeSlot) { setStaffSlots([]); return; }
+    if (!form.scheduledDate || !form.timeSlot) { setStaffSlots([]); setSubConflicts([]); return; }
     setSlotsLoading(true);
-    staffAPI.getBySlot(form.scheduledDate, form.timeSlot)
-      .then((res) => setStaffSlots(res.data.data))
-      .catch(() => setStaffSlots([]))
+    Promise.all([
+      staffAPI.getBySlot(form.scheduledDate, form.timeSlot),
+      subscriptionsAPI.checkConflict(form.scheduledDate, form.timeSlot),
+    ])
+      .then(([staffRes, conflictRes]) => {
+        setStaffSlots(staffRes.data.data);
+        setSubConflicts(conflictRes.data.data?.conflicts || []);
+      })
+      .catch(() => { setStaffSlots([]); setSubConflicts([]); })
       .finally(() => setSlotsLoading(false));
   }, [form.scheduledDate, form.timeSlot]);
 
@@ -246,6 +253,13 @@ export default function NewBooking() {
 
   const handleSubmit = async () => {
     if (!validate()) { toast.error('Please fill in all required fields'); return; }
+    if (subConflicts.length > 0) {
+      const names = subConflicts.map((c) => `${c.name} (${c.service})`).join(', ');
+      const ok = window.confirm(
+        `⚠️ Subscription Conflict!\n\n${names} ka is time slot mein subscription hai.\n\nKya phir bhi naya booking create karna chahte ho?`
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       const res = await bookingsAPI.adminCreate({
@@ -617,6 +631,29 @@ export default function NewBooking() {
               {errors.timeSlot && <p className="text-red-500 text-xs mt-1">{errors.timeSlot}</p>}
             </div>
           </div>
+
+          {/* Subscription conflict warning */}
+          {subConflicts.length > 0 && (
+            <div className="bg-orange-50 border border-orange-300 rounded-xl p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-orange-800 text-sm">Subscription Conflict!</div>
+                  <div className="text-xs text-orange-700 mt-1">
+                    Is slot mein pehle se subscription customer hai:
+                  </div>
+                  {subConflicts.map((c, i) => (
+                    <div key={i} className="mt-1.5 text-xs bg-orange-100 rounded-lg px-3 py-1.5 text-orange-800 font-medium">
+                      📦 {c.name} — {c.service} ({c.frequency})
+                    </div>
+                  ))}
+                  <div className="text-xs text-orange-600 mt-2">
+                    Alag time slot choose karo ya proceed karne se pehle confirm karo.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Worker availability grid */}
           {form.scheduledDate && form.timeSlot && (

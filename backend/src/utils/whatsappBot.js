@@ -269,18 +269,24 @@ const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
 };
 
 const sendBookingDone = async (to, name, bizName, phoneNumberId, token, data = {}) => {
-  const summary = data.service
-    ? `📋 *Booking Summary:*\n` +
-      `🧹 ${data.service} — ${data.subService}\n` +
+  const services = Array.isArray(data.selectedServices) ? data.selectedServices : [];
+  let summary = '';
+  if (services.length > 0) {
+    const lines = services
+      .map((s) => `🧹 ${s.subService}${s.price > 0 ? ` — ₹${s.price}` : ''}`)
+      .join('\n');
+    const total = services.reduce((sum, s) => sum + (s.price || 0), 0);
+    summary =
+      `📋 *Booking Summary:*\n${lines}\n` +
       `📅 ${fmtDate(data.date)}\n` +
       `🕐 ${data.timeSlot}\n` +
-      `💰 Estimated: ₹${data.quotedAmount}\n` +
-      `📍 ${data.address}\n\n`
-    : '';
+      (total > 0 ? `💰 Total: ₹${total}\n` : '') +
+      `📍 ${data.address}\n\n`;
+  }
   await sendText(to,
     `🎉 *Shukriya, ${name}! Booking mili!*\n\n` +
     summary +
-    `Hamaari team *1 ghante mein* aapko confirm karegi. 📞\n\n` +
+    `Hamaari team *1 ghante mein* aapko confirm karegi. \n\n` +
     `Koi sawaal? Yahan message karein — hum hain! 🙏\n\n` +
     `_${bizName} — Expert Cleaning at Your Doorstep_ ✨`,
     phoneNumberId, token

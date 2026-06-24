@@ -9,11 +9,11 @@ const sofaShineConfig = {
   name:  'SofaShine',
   token: () => process.env.SOFASHINE_META_TOKEN,
   services: [
-    { id: 'Home Cleaning',      emoji: '🛋️' },
-    { id: 'Deep Cleaning',      emoji: '🏠' },
-    { id: 'Appliance Cleaning', emoji: '🔧' },
-    { id: 'Pest Control',       emoji: '🐜' },
-    { id: 'Other / Custom',     emoji: '💬' },
+    { id: 'Home Cleaning',      emoji: '🛋️', desc: 'Sofa, Carpet, Bed, Dining Chairs' },
+    { id: 'Deep Cleaning',      emoji: '🏠', desc: 'Bathroom, Kitchen, Full Home, Office' },
+    { id: 'Appliance Cleaning', emoji: '🔧', desc: 'Microwave, Fridge, Fan, Gas Stove' },
+    { id: 'Pest Control',       emoji: '🐜', desc: 'Cockroach, Ant & Insect Control' },
+    { id: 'Other / Custom',     emoji: '💬', desc: 'Apni specific requirement batayein' },
   ],
   subServices: {
     'Home Cleaning': [
@@ -131,10 +131,11 @@ const fmtDate = (d) => d.toLocaleDateString('en-IN', { weekday: 'short', day: 'n
 // ── Step handlers ─────────────────────────────────────────────────────────────
 
 const askService = async (to, biz, token) => {
-  const rows = biz.services.map((s) => ({ id: s.id, title: `${s.emoji} ${s.id}` }));
+  const rows = biz.services.map((s) => ({
+    id: s.id, title: `${s.emoji} ${s.id}`, description: s.desc || '',
+  }));
   await sendList(to,
     `✨ *${biz.name}* — Expert Cleaning at Your Doorstep! 🙏\n\n` +
-    `⚡ Same Day Service Available\n` +
     `🌿 Eco-Friendly | Safe for Family & Pets\n` +
     `💰 Transparent Pricing — No Hidden Charges\n` +
     `⭐ 4.9 Rated | 100% Satisfaction Guaranteed\n\n` +
@@ -226,17 +227,35 @@ const askCustomRequest = async (to, phoneNumberId, token) => {
   );
 };
 
+const askAddMore = async (to, selectedServices, phoneNumberId, token) => {
+  const lines = selectedServices.map((s) => `  • ${s.subService}${s.price > 0 ? ` — ₹${s.price}` : ''}`).join('\n');
+  const total = selectedServices.reduce((sum, s) => sum + (s.price || 0), 0);
+  await sendButtons(to,
+    `✅ *Added!*\n\n` +
+    `📋 *Selected so far:*\n${lines}\n` +
+    (total > 0 ? `\n💰 *Total:* ₹${total}\n` : '') +
+    `\nKoi aur service add karni hai?`,
+    [
+      { id: 'ADD_MORE', title: '➕ Aur Add Karo' },
+      { id: 'CONTINUE', title: '✅ Booking Continue' },
+    ],
+    phoneNumberId, token
+  );
+};
+
 const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
+  const services = data.selectedServices || [{ subService: data.subService, price: data.quotedAmount || 0 }];
+  const serviceLines = services.map((s) => `  • ${s.subService}${s.price > 0 ? ` — ₹${s.price}` : ''}`).join('\n');
+  const total = services.reduce((sum, s) => sum + (s.price || 0), 0);
   const summary =
     `🧾 *Booking Details — ${bizName}*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🧹 *Service:* ${data.service}\n` +
-    `   └ ${data.subService}\n` +
+    `🧹 *Services:*\n${serviceLines}\n` +
     `📅 *Date:* ${fmtDate(data.date)}\n` +
     `🕐 *Time:* ${data.timeSlot}\n` +
     `📍 *Address:* ${data.address}\n` +
     `👤 *Name:* ${data.name}\n` +
-    `💰 *Estimated:* ₹${data.quotedAmount}\n` +
+    (total > 0 ? `💰 *Total Estimated:* ₹${total}\n` : '') +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `_Final amount on-site confirm hoga._\n\n` +
     `Sab sahi hai? Confirm karein 👇`;
@@ -309,22 +328,23 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         await askService(from, biz, token);
         break;
       }
-      // Create partial lead immediately so drop-offs are visible to admin
-      const partialLead = await Lead.create({
-        name: 'Incomplete',
-        phone: from,
-        serviceInterest: match.id,
-        source: 'whatsapp',
-        stage: 'new',
-        notes: 'WhatsApp bot — conversation in progress',
-      });
+      // Only create partial lead on first visit (preserve leadId when returning to add more services)
+      let leadId = conv.data.leadId;
+      if (!leadId) {
+        const partialLead = await Lead.create({
+          name: 'Incomplete', phone: from, serviceInterest: match.id,
+          source: 'whatsapp', stage: 'new',
+          notes: 'WhatsApp bot — conversation in progress',
+        });
+        leadId = partialLead._id.toString();
+      }
       // Custom request — skip sub-service list, ask them to describe
       if (match.id === 'Other / Custom') {
-        await save(conv, 'AWAITING_CUSTOM_REQUEST', { service: match.id, leadId: partialLead._id.toString() });
+        await save(conv, 'AWAITING_CUSTOM_REQUEST', { service: match.id, leadId });
         await askCustomRequest(from, phoneNumberId, token);
         break;
       }
-      await save(conv, 'AWAITING_SUBSERVICE', { service: match.id, leadId: partialLead._id.toString() });
+      await save(conv, 'AWAITING_SUBSERVICE', { service: match.id, leadId });
       await askSubService(from, biz, match.id, phoneNumberId, token);
       break;
     }
@@ -341,21 +361,42 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           notes: `Custom request: ${customDesc}`,
         });
       }
-      await save(conv, 'AWAITING_DATE', { subService: customDesc, quotedAmount: 0 });
-      await sendText(from, `✅ *Got it!* "${customDesc}"\n\nAb date select karein 👇`, phoneNumberId, token);
-      await askDate(from, phoneNumberId, token);
+      const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+      const updated  = [...existing, { service: 'Other / Custom', subService: customDesc, price: 0 }];
+      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: updated });
+      await askAddMore(from, updated, phoneNumberId, token);
       break;
     }
 
     case 'AWAITING_SUBSERVICE': {
-      const subs   = biz.subServices[conv.data.service] || [];
-      const match  = subs.find((s) => s.id.toLowerCase() === text.toLowerCase() || s.id === text);
+      const subs  = biz.subServices[conv.data.service] || [];
+      const match = subs.find((s) => s.id.toLowerCase() === text.toLowerCase() || s.id === text);
       if (!match) {
         await askSubService(from, biz, conv.data.service, phoneNumberId, token);
         break;
       }
-      await save(conv, 'AWAITING_DATE', { subService: match.id, quotedAmount: match.price });
-      await askDate(from, phoneNumberId, token);
+      const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+      const updated  = [...existing, { service: conv.data.service, subService: match.id, price: match.price }];
+      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: updated });
+      await askAddMore(from, updated, phoneNumberId, token);
+      break;
+    }
+
+    case 'AWAITING_ADD_MORE': {
+      if (text === 'ADD_MORE') {
+        await save(conv, 'AWAITING_SERVICE');
+        await askService(from, biz, token);
+        break;
+      }
+      if (text === 'CONTINUE') {
+        const services = conv.data.selectedServices || [];
+        const total    = services.reduce((sum, s) => sum + (s.price || 0), 0);
+        await save(conv, 'AWAITING_DATE', { quotedAmount: total });
+        await askDate(from, phoneNumberId, token);
+        break;
+      }
+      // Unrecognised input — re-show buttons
+      await askAddMore(from, conv.data.selectedServices || [], phoneNumberId, token);
       break;
     }
 
@@ -413,11 +454,15 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
     case 'AWAITING_CONFIRM': {
       if (text === 'CONFIRM_YES' || text.toLowerCase() === 'confirm' || text === '1') {
+        const services       = conv.data.selectedServices || [{ subService: conv.data.subService, price: conv.data.quotedAmount || 0 }];
+        const serviceInterest = services.map((s) => s.subService).join(' + ');
+        const totalAmount    = services.reduce((sum, s) => sum + (s.price || 0), 0);
+        const serviceNotes   = services.map((s) => `${s.subService}${s.price > 0 ? ` (₹${s.price})` : ''}`).join('\n');
         const leadData = {
           name:            conv.data.name,
-          serviceInterest: `${conv.data.service} — ${conv.data.subService}`,
-          quotedAmount:    conv.data.quotedAmount,
-          notes:           `Date: ${fmtDate(conv.data.date)}\nTime: ${conv.data.timeSlot}\nAddress: ${conv.data.address}`,
+          serviceInterest: serviceInterest,
+          quotedAmount:    totalAmount,
+          notes:           `Date: ${fmtDate(conv.data.date)}\nTime: ${conv.data.timeSlot}\nAddress: ${conv.data.address}\n\nServices:\n${serviceNotes}`,
           stage:           'new',
         };
         if (conv.data.leadId) {

@@ -103,6 +103,7 @@ export const leadsAPI = {
   delete: (id) => api.delete(`/leads/${id}`),
   getStats: () => api.get('/leads/stats'),
   confirm: (id) => api.post(`/leads/${id}/confirm`),
+  convert: (id, data) => api.post(`/leads/${id}/convert`, data),
 };
 
 export const subscriptionsAPI = {

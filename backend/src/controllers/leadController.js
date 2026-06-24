@@ -106,10 +106,33 @@ const normalizePhone = (phone) => {
 
 const confirmLead = async (req, res, next) => {
   try {
+    const Booking = require('../models/Booking');
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
 
     lead.stage = 'booked';
+
+    // Auto-create booking if we have all required scheduling data (from WhatsApp bot)
+    let bookingCreated = null;
+    if (lead.scheduledDate && lead.timeSlot && lead.address && !lead.convertedBookingId) {
+      bookingCreated = await Booking.create({
+        customerName:  lead.name,
+        customerEmail: '',
+        customerPhone: lead.phone,
+        serviceLabel:  lead.serviceInterest || 'Cleaning Service',
+        scheduledDate: lead.scheduledDate,
+        timeSlot:      lead.timeSlot,
+        address:       { line1: lead.address },
+        basePrice:     lead.quotedAmount || 0,
+        totalAmount:   lead.quotedAmount || 0,
+        payment:       { method: 'cod', amount: lead.quotedAmount || 0 },
+        source:        'admin',
+        status:        'confirmed',
+        adminNotes:    lead.notes || '',
+      });
+      lead.convertedBookingId = bookingCreated._id.toString();
+    }
+
     await lead.save();
 
     let whatsappSent = false;
@@ -122,14 +145,19 @@ const confirmLead = async (req, res, next) => {
 
       if (phoneNumberId && token) {
         const toPhone = normalizePhone(lead.phone);
+        const dateStr = lead.scheduledDate
+          ? new Date(lead.scheduledDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : '';
         const msg =
           `✅ *Booking Confirmed!*\n\n` +
           `Namaste *${lead.name}*! 🙏\n\n` +
           `Aapki booking confirm ho gayi hai.\n\n` +
           `🧹 Service: ${lead.serviceInterest || 'Cleaning Service'}\n` +
-          (lead.notes ? `📋 ${lead.notes}\n` : '') +
+          (dateStr ? `📅 Date: ${dateStr}\n` : '') +
+          (lead.timeSlot ? `🕐 Time: ${lead.timeSlot}\n` : '') +
+          (lead.address ? `📍 Address: ${lead.address}\n` : '') +
           `💰 Amount: ₹${lead.quotedAmount}\n\n` +
-          `Hamaari team jald aapke paas pahunchegi.\n` +
+          `Hamaari team aapke paas pahunchegi.\n` +
           `Koi sawaal ho toh hume yahan message karein. 🙏\n\n` +
           `_Thank you for choosing SofaShine!_`;
 
@@ -144,10 +172,62 @@ const confirmLead = async (req, res, next) => {
       }
     }
 
-    res.json({ success: true, data: lead, whatsappSent, whatsappError });
+    res.json({ success: true, data: lead, whatsappSent, whatsappError, bookingCreated: !!bookingCreated });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { getLeads, createLead, updateLead, deleteLead, getLeadStats, createWebsiteLead, confirmLead };
+const convertToBooking = async (req, res, next) => {
+  try {
+    const Booking = require('../models/Booking');
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+    if (lead.convertedBookingId) {
+      return res.status(400).json({ success: false, message: 'Booking already created for this lead' });
+    }
+
+    const {
+      scheduledDate = lead.scheduledDate,
+      timeSlot      = lead.timeSlot,
+      address       = lead.address,
+      staffId,
+      adminNotes,
+    } = req.body;
+
+    if (!scheduledDate || !timeSlot || !address) {
+      return res.status(400).json({ success: false, message: 'scheduledDate, timeSlot, and address are required' });
+    }
+
+    const booking = await Booking.create({
+      customerName:  lead.name,
+      customerEmail: '',
+      customerPhone: lead.phone,
+      serviceLabel:  lead.serviceInterest || 'Cleaning Service',
+      scheduledDate,
+      timeSlot,
+      address:       { line1: address },
+      basePrice:     lead.quotedAmount || 0,
+      totalAmount:   lead.quotedAmount || 0,
+      payment:       { method: 'cod', amount: lead.quotedAmount || 0 },
+      source:        'admin',
+      bookedBy:      req.user._id,
+      status:        'confirmed',
+      adminNotes:    adminNotes || lead.notes || '',
+      ...(staffId && { assignedStaff: staffId }),
+    });
+
+    lead.stage              = 'booked';
+    lead.convertedBookingId = booking._id.toString();
+    if (!lead.scheduledDate && scheduledDate) lead.scheduledDate = scheduledDate;
+    if (!lead.timeSlot && timeSlot)           lead.timeSlot      = timeSlot;
+    if (!lead.address && address)             lead.address       = address;
+    await lead.save();
+
+    res.json({ success: true, data: { lead, booking } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getLeads, createLead, updateLead, deleteLead, getLeadStats, createWebsiteLead, confirmLead, convertToBooking };

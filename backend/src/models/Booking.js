@@ -53,7 +53,7 @@ const bookingSchema = new mongoose.Schema(
     },
     customerEmail: {
       type: String,
-      required: [true, 'Customer email is required'],
+      default: '',
       trim: true,
       lowercase: true,
     },

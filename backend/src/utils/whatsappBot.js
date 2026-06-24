@@ -466,7 +466,10 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           name:            conv.data.name,
           serviceInterest: serviceInterest,
           quotedAmount:    totalAmount,
-          notes:           `Date: ${fmtDate(conv.data.date)}\nTime: ${conv.data.timeSlot}\nAddress: ${conv.data.address}\n\nServices:\n${serviceNotes}`,
+          scheduledDate:   conv.data.date,
+          timeSlot:        conv.data.timeSlot,
+          address:         conv.data.address,
+          notes:           `Services:\n${serviceNotes}`,
           stage:           'new',
         };
         if (conv.data.leadId) {

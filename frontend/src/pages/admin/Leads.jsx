@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Plus, Phone, Search, Trash2, RefreshCw, ChevronDown, X, Save,
+  Plus, Phone, Search, Trash2, RefreshCw, X, Save, Calendar,
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -113,6 +113,104 @@ function AddLeadModal({ onClose, onSaved }) {
   );
 }
 
+// ─── Convert to Booking Modal ─────────────────────────────────────────────────
+function ConvertToBookingModal({ lead, onClose, onConverted }) {
+  const toInputDate = (d) => d ? new Date(d).toISOString().split('T')[0] : '';
+
+  const [form, setForm] = useState({
+    scheduledDate: toInputDate(lead.scheduledDate),
+    timeSlot:      lead.timeSlot  || '',
+    address:       lead.address   || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSkip = async () => {
+    try {
+      await leadsAPI.update(lead._id, { stage: 'booked' });
+      onConverted(lead._id, null);
+      toast.success('Moved to Booked');
+      onClose();
+    } catch {
+      toast.error('Failed to update stage');
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!form.scheduledDate || !form.timeSlot.trim() || !form.address.trim()) {
+      toast.error('Date, time slot, and address are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await leadsAPI.convert(lead._id, form);
+      onConverted(lead._id, res.data.data.booking);
+      toast.success(`Booking ${res.data.data.booking.bookingId} created & scheduled!`);
+      onClose();
+    } catch {
+      toast.error('Failed to create booking');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-green-600" />
+            <h3 className="font-semibold text-gray-900">Schedule Booking</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+            <div className="font-medium text-gray-900">{lead.name}</div>
+            <div className="text-gray-500 text-xs">{lead.phone}</div>
+            {lead.serviceInterest && <div className="text-gray-600">🧹 {lead.serviceInterest}</div>}
+            {lead.quotedAmount > 0 && <div className="text-gray-600">💰 ₹{lead.quotedAmount}</div>}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Service Date *</label>
+            <input type="date" value={form.scheduledDate}
+              onChange={(e) => set('scheduledDate', e.target.value)}
+              className="input-field text-sm w-full" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Time Slot *</label>
+            <input value={form.timeSlot}
+              onChange={(e) => set('timeSlot', e.target.value)}
+              placeholder="e.g. 10:00 AM - 12:00 PM"
+              className="input-field text-sm w-full" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Address *</label>
+            <textarea value={form.address}
+              onChange={(e) => set('address', e.target.value)}
+              rows={2} placeholder="Full address..."
+              className="input-field text-sm w-full resize-none" />
+          </div>
+        </div>
+        <div className="px-5 pb-5 flex gap-3">
+          <button onClick={handleSkip}
+            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-50 transition-colors">
+            Skip (Stage Only)
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="btn-primary flex-1 text-sm gap-2">
+            <Save className="w-4 h-4" />
+            {saving ? 'Creating...' : 'Create Booking'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Lead Card ────────────────────────────────────────────────────────────────
 function LeadCard({ lead, onStageChange, onDelete, onConfirm }) {
   const [confirming, setConfirming] = React.useState(false);
@@ -151,8 +249,17 @@ function LeadCard({ lead, onStageChange, onDelete, onConfirm }) {
       {lead.followUpDate && (
         <div className="text-xs text-orange-500 mb-2">📅 Follow up: {formatDate(lead.followUpDate)}</div>
       )}
+      {lead.scheduledDate && (
+        <div className="text-xs text-blue-500 mb-2">📅 {formatDate(lead.scheduledDate)}{lead.timeSlot ? ` · ${lead.timeSlot}` : ''}</div>
+      )}
+      {lead.address && (
+        <div className="text-xs text-gray-500 mb-2 line-clamp-1">📍 {lead.address}</div>
+      )}
       {lead.notes && (
         <div className="text-xs text-gray-400 mb-2 line-clamp-2">{lead.notes}</div>
+      )}
+      {lead.convertedBookingId && (
+        <div className="text-xs text-green-600 mb-2 font-medium">✅ Booking scheduled</div>
       )}
 
       <div className="flex items-center gap-1 mt-3">
@@ -192,6 +299,7 @@ export default function Leads() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [bookingModal, setBookingModal] = useState(null); // lead to convert
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -215,6 +323,11 @@ export default function Leads() {
   }, [fetchData]);
 
   const handleStageChange = async (id, stage) => {
+    if (stage === 'booked') {
+      const lead = leads.find((l) => l._id === id);
+      setBookingModal(lead);
+      return;
+    }
     try {
       await leadsAPI.update(id, { stage });
       setLeads((prev) => prev.map((l) => l._id === id ? { ...l, stage } : l));
@@ -224,20 +337,65 @@ export default function Leads() {
     }
   };
 
+  const handleBookingConverted = (id, booking) => {
+    setLeads((prev) => prev.map((l) =>
+      l._id === id
+        ? { ...l, stage: 'booked', ...(booking && { convertedBookingId: booking._id }) }
+        : l
+    ));
+    fetchData(); // refresh stats
+  };
+
+  const openWhatsApp = (lead) => {
+    const digits = String(lead.phone || '').replace(/\D/g, '');
+    const phone = digits.length === 10 ? `91${digits}` : digits;
+    const parts = [
+      `✅ *Booking Confirmed!*`,
+      ``,
+      `Namaste *${lead.name}*! 🙏`,
+      ``,
+      `Aapki booking confirm ho gayi hai.`,
+      ``,
+      lead.serviceInterest ? `🧹 Service: ${lead.serviceInterest}` : null,
+      lead.scheduledDate   ? `📅 Date: ${new Date(lead.scheduledDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : null,
+      lead.timeSlot        ? `🕐 Time: ${lead.timeSlot}` : null,
+      lead.address         ? `📍 Address: ${lead.address}` : null,
+      lead.quotedAmount    ? `💰 Amount: ₹${lead.quotedAmount}` : null,
+      ``,
+      `Hamaari team aapke paas pahunchegi. Koi sawaal ho toh yahan message karein. 🙏`,
+      ``,
+      `_Thank you for choosing SofaShine!_`,
+    ].filter((l) => l !== null).join('\n');
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(parts)}`, '_blank');
+  };
+
   const handleConfirm = async (id) => {
+    const lead = leads.find((l) => l._id === id);
     try {
       const res = await leadsAPI.confirm(id);
       setLeads((prev) => prev.map((l) => l._id === id ? { ...l, stage: 'booked' } : l));
-      if (res.data.whatsappSent) {
+      if (res.data.bookingCreated) {
+        toast.success('Booking confirmed & scheduled automatically!');
+      } else if (res.data.whatsappSent) {
         toast.success('Booking confirmed! WhatsApp message sent to customer.');
       } else {
         toast.success('Booking confirmed!');
-        toast('WhatsApp message could not be sent. Ask the customer to message you on WhatsApp first, then try again.', {
-          icon: '⚠️',
-          duration: 6000,
-          style: { background: '#fff3cd', color: '#7d5a00', maxWidth: '380px' },
-        });
+        toast(
+          () => (
+            <span style={{ fontSize: 13 }}>
+              Auto-message fail (24h window).{' '}
+              <button
+                onClick={() => lead && openWhatsApp(lead)}
+                style={{ color: '#25D366', fontWeight: 600, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                📲 Open WhatsApp Chat
+              </button>
+            </span>
+          ),
+          { icon: '⚠️', duration: 12000 }
+        );
       }
+      fetchData();
     } catch {
       toast.error('Failed to confirm booking');
     }
@@ -259,6 +417,13 @@ export default function Leads() {
   return (
     <AdminLayout title="Leads">
       {showAdd && <AddLeadModal onClose={() => setShowAdd(false)} onSaved={fetchData} />}
+      {bookingModal && (
+        <ConvertToBookingModal
+          lead={bookingModal}
+          onClose={() => setBookingModal(null)}
+          onConverted={handleBookingConverted}
+        />
+      )}
 
       {/* Stats */}
       <div className="flex flex-wrap gap-3 mb-6">

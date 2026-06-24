@@ -9,6 +9,8 @@ const conversationSchema = new mongoose.Schema({
     enum: [
       'AWAITING_SERVICE',
       'AWAITING_SUBSERVICE',
+      'AWAITING_CUSTOM_REQUEST',
+      'AWAITING_ADD_MORE',
       'AWAITING_DATE',
       'AWAITING_TIME',
       'AWAITING_ADDRESS',
@@ -18,13 +20,15 @@ const conversationSchema = new mongoose.Schema({
     ],
   },
   data: {
-    service:      String,   // e.g. 'Sofa Cleaning'
-    subService:   String,   // e.g. '3 Seater'
-    quotedAmount: Number,
-    date:         Date,
-    timeSlot:     String,
-    address:      String,
-    name:         String,
+    service:          String,
+    subService:       String,
+    quotedAmount:     Number,
+    date:             Date,
+    timeSlot:         String,
+    address:          String,
+    name:             String,
+    leadId:           String,
+    selectedServices: { type: mongoose.Schema.Types.Mixed, default: [] },
   },
   lastActivity: { type: Date, default: Date.now },
 }, { timestamps: true });

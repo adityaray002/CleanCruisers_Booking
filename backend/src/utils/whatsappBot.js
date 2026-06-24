@@ -9,31 +9,38 @@ const sofaShineConfig = {
   name:  'SofaShine',
   token: () => process.env.SOFASHINE_META_TOKEN,
   services: [
-    { id: 'Sofa Cleaning',     emoji: '🛋️' },
-    { id: 'Carpet Cleaning',   emoji: '🏠' },
-    { id: 'Mattress Cleaning', emoji: '🛏️' },
-    { id: 'Chair Cleaning',    emoji: '🪑' },
+    { id: 'Home Cleaning',      emoji: '🛋️' },
+    { id: 'Deep Cleaning',      emoji: '🏠' },
+    { id: 'Appliance Cleaning', emoji: '🔧' },
+    { id: 'Pest Control',       emoji: '🐜' },
   ],
   subServices: {
-    'Sofa Cleaning':     [
-      { id: '2 Seater',  price: 499  },
-      { id: '3 Seater',  price: 699  },
-      { id: 'L-Shape',   price: 999  },
+    'Home Cleaning': [
+      { id: 'Sofa — 2 Seater',   price: 220 },
+      { id: 'Sofa — 3 Seater',   price: 330 },
+      { id: 'Sofa — L-Shape',    price: 550 },
+      { id: 'Carpet — Small',    price: 299 },
+      { id: 'Carpet — Medium',   price: 499 },
+      { id: 'Carpet — Large',    price: 799 },
+      { id: 'Bed Cleaning',      price: 149 },
+      { id: 'Dining — 4 Chairs', price: 360 },
     ],
-    'Carpet Cleaning':   [
-      { id: 'Small (up to 4x6 ft)',   price: 499  },
-      { id: 'Medium (up to 6x9 ft)',  price: 799  },
-      { id: 'Large (above 6x9 ft)',   price: 1199 },
+    'Deep Cleaning': [
+      { id: 'Bathroom Cleaning', price: 299  },
+      { id: 'Kitchen Cleaning',  price: 699  },
+      { id: '1 BHK Full Home',   price: 2499 },
+      { id: 'Office Deep Clean', price: 1999 },
     ],
-    'Mattress Cleaning': [
-      { id: 'Single Mattress', price: 399 },
-      { id: 'Double Mattress', price: 599 },
-      { id: 'King Size',       price: 799 },
+    'Appliance Cleaning': [
+      { id: 'Microwave',         price: 149 },
+      { id: 'Gas Stove',         price: 99  },
+      { id: 'Refrigerator',      price: 299 },
+      { id: 'Ceiling Fan',       price: 59  },
+      { id: 'Exhaust Fan',       price: 79  },
+      { id: 'Kitchen Window',    price: 199 },
     ],
-    'Chair Cleaning':    [
-      { id: '1 Chair',  price: 299 },
-      { id: '2 Chairs', price: 499 },
-      { id: '4 Chairs', price: 799 },
+    'Pest Control': [
+      { id: 'Pest Control',      price: 399 },
     ],
   },
 };
@@ -125,9 +132,14 @@ const fmtDate = (d) => d.toLocaleDateString('en-IN', { weekday: 'short', day: 'n
 const askService = async (to, biz, token) => {
   const rows = biz.services.map((s) => ({ id: s.id, title: `${s.emoji} ${s.id}` }));
   await sendList(to,
-    `Namaste! 🙏 *${biz.name}* mein aapka swagat hai!\n\nKaunsi service chahiye aapko?`,
-    'Services dekho',
-    [{ title: 'Hamaari Services', rows }],
+    `✨ *${biz.name}* — Expert Cleaning at Your Doorstep! 🙏\n\n` +
+    `⚡ Same Day Service Available\n` +
+    `🌿 Eco-Friendly | Safe for Family & Pets\n` +
+    `💰 Transparent Pricing — No Hidden Charges\n` +
+    `⭐ 4.9 Rated | 100% Satisfaction Guaranteed\n\n` +
+    `Neeche se apni service select karein 👇`,
+    'Services Dekho',
+    [{ title: '🧹 Hamaari Services', rows }],
     process.env[`${biz.id.toUpperCase()}_PHONE_NUMBER_ID`],
     token
   );
@@ -221,12 +233,22 @@ const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
   );
 };
 
-const sendBookingDone = async (to, name, bizName, phoneNumberId, token) => {
+const sendBookingDone = async (to, name, bizName, phoneNumberId, token, data = {}) => {
+  const summary = data.service
+    ? `📋 *Booking Summary:*\n` +
+      `🧹 ${data.service} — ${data.subService}\n` +
+      `📅 ${fmtDate(data.date)}\n` +
+      `🕐 ${data.timeSlot}\n` +
+      `💰 Estimated: ₹${data.quotedAmount}\n` +
+      `📍 ${data.address}\n\n` +
+      `_Final amount on-site verify hoga._\n\n`
+    : '';
   await sendText(to,
-    `🎉 *Booking request receive ho gayi, ${name}!*\n\n` +
-    `Hamaari team jald aapko confirm karegi.\n\n` +
-    `Koi sawaal ho toh hume message karein.\n\n` +
-    `_Thank you for choosing ${bizName}!_ 🙏`,
+    `🎉 *Shukriya, ${name}! Booking mili!*\n\n` +
+    summary +
+    `Hamaari team *1 ghante mein* aapko confirm karegi. 📞\n\n` +
+    `Koi sawaal? Yahan message karein — hum hain! 🙏\n\n` +
+    `_${bizName} — Expert Cleaning at Your Doorstep_ ✨`,
     phoneNumberId, token
   );
 };
@@ -364,7 +386,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         }
 
         await save(conv, 'COMPLETED');
-        await sendBookingDone(from, conv.data.name, biz.name, phoneNumberId, token);
+        await sendBookingDone(from, conv.data.name, biz.name, phoneNumberId, token, conv.data);
         console.log(`[BOT] ✅ Lead confirmed — ${conv.data.name} (${from}) — ${biz.name}`);
 
       } else if (text === 'CONFIRM_NO' || text.toLowerCase() === 'cancel' || text === '2') {

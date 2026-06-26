@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const Message = require('../models/Message');
 
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'cleancruisers_webhook_2024';
+
+const getBizId = (phoneNumberId) => {
+  if (phoneNumberId === process.env.SOFASHINE_PHONE_NUMBER_ID)     return 'sofashine';
+  if (phoneNumberId === process.env.CLEANCRUISERS_PHONE_NUMBER_ID) return 'cleancruisers';
+  return 'unknown';
+};
 
 // Meta webhook verification — GET request from Meta to confirm endpoint
 router.get('/', (req, res) => {
@@ -33,20 +40,41 @@ router.post('/', (req, res) => {
   // Ignore status updates (delivered, read, etc.)
   if (!value?.messages?.length) return;
 
-  const message      = value.messages[0];
-  const businessPhone = value.metadata?.phone_number_id; // Meta phone number ID (maps to business)
-  const from         = message.from; // customer's phone
-  const msgType      = message.type; // text, interactive, location, etc.
+  const message       = value.messages[0];
+  const businessPhone = value.metadata?.phone_number_id;
+  const from          = message.from;
+  const msgType       = message.type;
 
   let text = '';
   if (msgType === 'text')        text = message.text?.body?.trim() || '';
   if (msgType === 'interactive') text = message.interactive?.button_reply?.id || message.interactive?.list_reply?.id || '';
   if (msgType === 'location') {
-    // Customer shared location pin
     text = `__LOCATION__:${message.location.latitude},${message.location.longitude}`;
   }
 
+  // Human-readable version saved to inbox (titles instead of IDs)
+  let displayText = text;
+  if (msgType === 'interactive') {
+    const r = message.interactive?.button_reply || message.interactive?.list_reply;
+    displayText = r?.title || text;
+  } else if (msgType === 'location') {
+    displayText = '📍 Location shared';
+  } else if (!displayText) {
+    displayText = `[${msgType}]`;
+  }
+
   console.log(`[WEBHOOK] 📩 ${businessPhone} ← ${from}: "${text}"`);
+
+  // Save inbound message to inbox (fire-and-forget)
+  Message.create({
+    customerPhone: from,
+    businessId:    getBizId(businessPhone),
+    direction:     'inbound',
+    text:          displayText,
+    sentBy:        'customer',
+    msgType,
+    waMessageId:   message.id,
+  }).catch(() => {});
 
   // Hand off to bot handler (async — don't block the 200 response)
   const { handleIncoming } = require('../utils/whatsappBot');

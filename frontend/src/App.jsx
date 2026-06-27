@@ -20,6 +20,7 @@ import ScheduleView from './pages/admin/ScheduleView';
 import Customers from './pages/admin/Customers';
 import Leads from './pages/admin/Leads';
 import Subscriptions from './pages/admin/Subscriptions';
+import WhatsAppInbox from './pages/admin/WhatsAppInbox';
 
 export default function App() {
   return (
@@ -86,6 +87,11 @@ export default function App() {
           path="/admin/subscriptions"
           element={<ProtectedRoute><Subscriptions /></ProtectedRoute>}
         />
+        <Route
+          path="/admin/inbox"
+          element={<ProtectedRoute><WhatsAppInbox /></ProtectedRoute>}
+        />
+
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

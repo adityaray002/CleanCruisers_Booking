@@ -20,6 +20,7 @@ const customerRoutes = require('./src/routes/customers');
 const leadRoutes = require('./src/routes/leads');
 const subscriptionRoutes = require('./src/routes/subscriptions');
 const webhookRoutes = require('./src/routes/webhook');
+const inboxRoutes   = require('./src/routes/inbox');
 
 const app = express();
 
@@ -90,6 +91,7 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/webhook/whatsapp', webhookRoutes);
+app.use('/api/inbox', inboxRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

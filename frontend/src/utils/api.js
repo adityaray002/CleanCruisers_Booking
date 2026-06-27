@@ -106,6 +106,12 @@ export const leadsAPI = {
   convert: (id, data) => api.post(`/leads/${id}/convert`, data),
 };
 
+export const inboxAPI = {
+  getAll:      ()                  => api.get('/inbox'),
+  getMessages: (phone, businessId) => api.get(`/inbox/${phone}`, { params: { businessId } }),
+  sendReply:   (phone, data)       => api.post(`/inbox/${phone}/reply`, data),
+};
+
 export const subscriptionsAPI = {
   getAll: (params) => api.get('/subscriptions', { params }),
   create: (data) => api.post('/subscriptions', data),

@@ -1,7 +1,35 @@
 const Conversation = require('../models/Conversation');
 const Lead         = require('../models/Lead');
-const { sendText, sendButtons, sendList } = require('./metaWhatsApp');
+const Message      = require('../models/Message');
+const { sendText: _sendText, sendButtons: _sendButtons, sendList: _sendList } = require('./metaWhatsApp');
 const { getAvailableSlots } = require('./slotManager');
+
+// Track phone → businessId so outbound bot messages can be saved to inbox
+const _phoneBizMap = new Map();
+
+const sendText = async (to, text, phoneNumberId, token) => {
+  await _sendText(to, text, phoneNumberId, token);
+  const bizId = _phoneBizMap.get(to);
+  if (bizId) Message.create({ customerPhone: to, businessId: bizId, direction: 'outbound', text, sentBy: 'bot' }).catch(() => {});
+};
+
+const sendButtons = async (to, bodyText, buttons, phoneNumberId, token) => {
+  await _sendButtons(to, bodyText, buttons, phoneNumberId, token);
+  const bizId = _phoneBizMap.get(to);
+  if (bizId) {
+    const opts = buttons.map((b) => b.title).join(' · ');
+    Message.create({ customerPhone: to, businessId: bizId, direction: 'outbound', text: `${bodyText}\n[${opts}]`, sentBy: 'bot', msgType: 'interactive' }).catch(() => {});
+  }
+};
+
+const sendList = async (to, header, body, sections, phoneNumberId, token) => {
+  await _sendList(to, header, body, sections, phoneNumberId, token);
+  const bizId = _phoneBizMap.get(to);
+  if (bizId) {
+    const items = sections.flatMap((s) => s.rows?.map((r) => r.title) || []).join(', ');
+    Message.create({ customerPhone: to, businessId: bizId, direction: 'outbound', text: `${header} — ${body} [${items}]`, sentBy: 'bot', msgType: 'interactive' }).catch(() => {});
+  }
+};
 
 // ── Business config ───────────────────────────────────────────────────────────
 const sofaShineConfig = {
@@ -302,6 +330,8 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
     console.warn(`[BOT] Unknown phoneNumberId: ${businessPhone}`);
     return;
   }
+
+  _phoneBizMap.set(from, biz.id);
 
   const token         = biz.token();
   const phoneNumberId = businessPhone;

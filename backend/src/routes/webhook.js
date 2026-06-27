@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const Message = require('../models/Message');
 
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'cleancruisers_webhook_2024';
+
+const getBizId = (phoneNumberId) => {
+  if (phoneNumberId === process.env.SOFASHINE_PHONE_NUMBER_ID)     return 'sofashine';
+  if (phoneNumberId === process.env.CLEANCRUISERS_PHONE_NUMBER_ID) return 'cleancruisers';
+  return 'unknown';
+};
 
 // Meta webhook verification — GET request from Meta to confirm endpoint
 router.get('/', (req, res) => {
@@ -45,7 +52,29 @@ router.post('/', (req, res) => {
     text = `__LOCATION__:${message.location.latitude},${message.location.longitude}`;
   }
 
+  // Human-readable display text for inbox (titles instead of raw IDs)
+  let displayText = text;
+  if (msgType === 'interactive') {
+    const r = message.interactive?.button_reply || message.interactive?.list_reply;
+    displayText = r?.title || text;
+  } else if (msgType === 'location') {
+    displayText = '📍 Location shared';
+  } else if (!displayText) {
+    displayText = `[${msgType}]`;
+  }
+
   console.log(`[WEBHOOK] 📩 ${businessPhone} ← ${from}: "${text}"`);
+
+  // Save inbound message (auto-deletes after 7 days via TTL index)
+  Message.create({
+    customerPhone: from,
+    businessId:    getBizId(businessPhone),
+    direction:     'inbound',
+    text:          displayText,
+    sentBy:        'customer',
+    msgType,
+    waMessageId:   message.id,
+  }).catch(() => {});
 
   // Hand off to bot handler (async — don't block the 200 response)
   const { handleIncoming } = require('../utils/whatsappBot');

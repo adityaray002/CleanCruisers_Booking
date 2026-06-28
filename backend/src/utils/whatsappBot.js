@@ -84,39 +84,39 @@ const sofaShineConfig = {
   subServices: {
     'Home Cleaning': [
       // Sofa — seat-based pricing (max 5 rows in this section)
-      { id: 'Sofa — 2 Seats',  price: 220, section: '🛋️ Sofa Cleaning', desc: '₹220' },
-      { id: 'Sofa — 3 Seats',  price: 330, section: '🛋️ Sofa Cleaning', desc: '₹330' },
-      { id: 'Sofa — 4 Seats',  price: 440, section: '🛋️ Sofa Cleaning', desc: '₹440' },
-      { id: 'Sofa — L-Shape',  price: 600, section: '🛋️ Sofa Cleaning', desc: '₹600' },
-      { id: 'Sofa — 5+ Seats', price:   0, section: '🛋️ Sofa Cleaning', desc: '₹100/seat', askCount: true },
+      { id: 'Sofa — 2 Seats',  price: 220, section: '🛋️ Sofa Cleaning', desc: 'Steam + stain treat + dry · ₹220' },
+      { id: 'Sofa — 3 Seats',  price: 330, section: '🛋️ Sofa Cleaning', desc: 'Steam + stain treat + dry · ₹330' },
+      { id: 'Sofa — 4 Seats',  price: 440, section: '🛋️ Sofa Cleaning', desc: 'Steam + stain treat + dry · ₹440' },
+      { id: 'Sofa — L-Shape',  price: 600, section: '🛋️ Sofa Cleaning', desc: 'Full steam + fabric care · ₹600' },
+      { id: 'Sofa — 5+ Seats', price:   0, section: '🛋️ Sofa Cleaning', desc: 'Premium steam clean · ₹100/seat', askCount: true },
       // Other items — quantity-based (max 5 rows — total stays at 10, WhatsApp limit)
-      { id: 'Mattress',        price: 299, section: '🏠 Other Items', desc: '₹299/piece', askQty: true },
-      { id: 'Carpet',          price: 399, section: '🏠 Other Items', desc: '₹399/piece', askQty: true },
-      { id: 'Dining Chair',    price:  90, section: '🏠 Other Items', desc: '₹90/chair',  askQty: true },
-      { id: 'Office Chair',    price: 120, section: '🏠 Other Items', desc: '₹120/chair', askQty: true },
-      { id: 'Curtains (pair)', price: 149, section: '🏠 Other Items', desc: '₹149/pair',  askQty: true },
+      { id: 'Mattress',        price: 299, section: '🏠 Other Items', desc: 'UV sanitize + mite removal · ₹299', askQty: true },
+      { id: 'Carpet',          price: 399, section: '🏠 Other Items', desc: 'Dry + steam + stain removal · ₹399', askQty: true },
+      { id: 'Dining Chair',    price:  90, section: '🏠 Other Items', desc: 'Fabric clean + deodorize · ₹90',   askQty: true },
+      { id: 'Office Chair',    price: 120, section: '🏠 Other Items', desc: 'Full upholstery clean · ₹120',     askQty: true },
+      { id: 'Curtains (pair)', price: 149, section: '🏠 Other Items', desc: 'Steam + dust removal · ₹149',      askQty: true },
     ],
     'Deep Cleaning': [
-      { id: 'Bathroom Cleaning', price: 299,  desc: '₹299 · 1-2 hrs' },
-      { id: 'Kitchen Cleaning',  price: 699,  desc: '₹699 · 2-3 hrs' },
-      { id: '1 BHK Full Home',   price: 2499, desc: '₹2499 · 4-5 hrs' },
-      { id: '2 BHK Full Home',   price: 3499, desc: '₹3499 · 6-7 hrs' },
-      { id: '3 BHK Full Home',   price: 4499, desc: '₹4499 · 7-8 hrs' },
-      { id: 'Office Deep Clean', price: 1999, desc: '₹1999 · area based' },
+      { id: 'Bathroom Cleaning', price: 299,  desc: 'Tiles + grout scrub + sanitize · ₹299' },
+      { id: 'Kitchen Cleaning',  price: 699,  desc: 'Chimney + stove + sink + tiles · ₹699' },
+      { id: '1 BHK Full Home',   price: 2499, desc: 'All rooms + kitchen + bathroom · ₹2499' },
+      { id: '2 BHK Full Home',   price: 3499, desc: '2 bed + kitchen + bathrooms · ₹3499' },
+      { id: '3 BHK Full Home',   price: 4499, desc: '3 bed + kitchen + bathrooms · ₹4499' },
+      { id: 'Office Deep Clean', price: 1999, desc: 'Workstations + washroom + floor · ₹1999' },
     ],
     'Appliance Cleaning': [
-      { id: 'AC Service',        price: 349, desc: '₹349/unit',  askQty: true },
-      { id: 'Refrigerator',      price: 299, desc: '₹299' },
-      { id: 'Microwave',         price: 149, desc: '₹149' },
-      { id: 'Gas Stove',         price:  99, desc: '₹99' },
-      { id: 'Ceiling Fan',       price:  59, desc: '₹59/fan',   askQty: true },
-      { id: 'Exhaust Fan',       price:  79, desc: '₹79' },
-      { id: 'Kitchen Window',    price: 199, desc: '₹199' },
+      { id: 'AC Service',        price: 349, desc: 'Filter + coil + drain clean · ₹349',    askQty: true },
+      { id: 'Refrigerator',      price: 299, desc: 'Inside + outside + coils + seals · ₹299' },
+      { id: 'Microwave',         price: 149, desc: 'Inside + outside + turntable · ₹149' },
+      { id: 'Gas Stove',         price:  99, desc: 'Burners + grates + surface · ₹99' },
+      { id: 'Ceiling Fan',       price:  59, desc: 'Blades + housing + motor · ₹59',        askQty: true },
+      { id: 'Exhaust Fan',       price:  79, desc: 'Blades + filter + motor clean · ₹79' },
+      { id: 'Kitchen Window',    price: 199, desc: 'Glass + frame + tracks · ₹199' },
     ],
     'Pest Control': [
-      { id: 'Cockroach Control', price: 499, desc: '₹499 · 1 BHK' },
-      { id: 'Full Pest Control', price: 799, desc: '₹799 · full home' },
-      { id: 'Ant Treatment',     price: 349, desc: '₹349' },
+      { id: 'Cockroach Control', price: 499, desc: 'Gel + spray + 3 month warranty · ₹499' },
+      { id: 'Full Pest Control', price: 799, desc: 'All insects + rodent control · ₹799' },
+      { id: 'Ant Treatment',     price: 349, desc: 'Bait + spray treatment · ₹349' },
     ],
   },
 };
@@ -372,29 +372,32 @@ const showCart = async (to, cart, service, phoneNumberId, token, showUpsell = fa
 // ── Date & time selection ─────────────────────────────────────────────────────
 
 const askDate = async (to, phoneNumberId, token) => {
-  await sendButtons(to,
-    `📅 *Kab chahiye service?*\n\n` +
-    `_Hum 7 days a week available hain!_\n` +
-    `_(Koi aur date? Type karein: DD/MM/YYYY — jaise 25/07/2025)_`,
-    [
-      { id: 'aaj',    title: '⚡ Aaj (Today)' },
-      { id: 'kal',    title: '🌅 Kal (Tomorrow)' },
-      { id: 'parson', title: '📆 Parson' },
-    ],
+  await sendList(to,
+    `📅 *Kab chahiye service?*\n\n_Hum 7 days a week available hain!_`,
+    `Date Chunein`,
+    [{
+      title: '📆 Date Select Karein',
+      rows: [
+        { id: 'aaj',        title: '⚡ Aaj (Today)',       description: 'Aaj hi service schedule karein' },
+        { id: 'kal',        title: '🌅 Kal (Tomorrow)',    description: 'Kal ke liye book karein' },
+        { id: 'parson',     title: '📆 Parson',            description: '2 din baad ki date' },
+        { id: 'CUSTOM_DATE',title: '🗓️ Koi Aur Date',     description: 'Apni marzi ki date chunein' },
+      ],
+    }],
     phoneNumberId, token
   );
 };
 
-// Simple time preference — 3 buttons, no slot IDs, no special chars
+// Simple time preference — 3 buttons, no times shown
 const askTimePreference = async (to, date, phoneNumberId, token) => {
   await sendButtons(to,
     `✅ *${fmtDate(date)}* — Perfect!\n\n` +
-    `🕐 *Kaunsa time prefer karte ho?*\n\n` +
-    `_(Exact time hamaari team booking confirm hone ke baad batayegi)_`,
+    `🕐 *Din ka kaunsa waqt prefer karte ho?*\n\n` +
+    `_(Exact time hamaari team booking confirm hone ke baad call karke batayegi)_`,
     [
-      { id: 'PREF_MORNING',   title: '🌅 Morning (9AM–1PM)' },
-      { id: 'PREF_AFTERNOON', title: '☀️ Afternoon (1–5PM)' },
-      { id: 'PREF_EVENING',   title: '🌆 Evening (5–8PM)' },
+      { id: 'PREF_MORNING',   title: '🌅 Morning' },
+      { id: 'PREF_AFTERNOON', title: '☀️ Afternoon' },
+      { id: 'PREF_EVENING',   title: '🌆 Evening' },
     ],
     phoneNumberId, token
   );
@@ -869,9 +872,19 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
     // ── Date Selection ────────────────────────────────────────────────────────
     case 'AWAITING_DATE': {
+      if (text === 'CUSTOM_DATE') {
+        await sendText(from,
+          `📅 *Apni date type karein:*\n\n` +
+          `Format: *DD/MM/YYYY*\n` +
+          `_Jaise: 15/08/2025_`,
+          phoneNumberId, token
+        );
+        break; // Stay in AWAITING_DATE — next message will be the typed date
+      }
       const date = parseDate(text);
       if (!date) {
         await sendText(from, `⚠️ Date samajh nahi aaya. Kripya *DD/MM/YYYY* format mein likhein — jaise: *25/07/2025*`, phoneNumberId, token);
+        await askDate(from, phoneNumberId, token);
         break;
       }
       await save(conv, 'AWAITING_TIME', { date });
@@ -889,9 +902,9 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
     // ── Time Preference ───────────────────────────────────────────────────────
     case 'AWAITING_TIME': {
       const prefMap = {
-        PREF_MORNING:   'Morning (9AM - 1PM)',
-        PREF_AFTERNOON: 'Afternoon (1PM - 5PM)',
-        PREF_EVENING:   'Evening (5PM - 8PM)',
+        PREF_MORNING:   'Morning',
+        PREF_AFTERNOON: 'Afternoon',
+        PREF_EVENING:   'Evening',
       };
       const timeSlot = prefMap[text];
 

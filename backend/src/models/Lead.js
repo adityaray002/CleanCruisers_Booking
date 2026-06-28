@@ -22,7 +22,8 @@ const leadSchema = new mongoose.Schema(
     timeSlot:           { type: String, trim: true },
     address:            { type: String, trim: true },
     convertedBookingId: { type: String },
-    addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    addedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    archived: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

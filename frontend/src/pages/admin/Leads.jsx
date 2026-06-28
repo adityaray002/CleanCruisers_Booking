@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Plus, Phone, Search, Trash2, RefreshCw, X, Save, Calendar, Eye, Clock,
+  Plus, Phone, Search, Archive, RefreshCw, X, Save, Calendar, Eye, Clock, Download, RotateCcw,
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -40,7 +40,7 @@ const fmtDateTime = (d) =>
   });
 
 // ─── Lead Detail Modal ────────────────────────────────────────────────────────
-function LeadDetailModal({ lead, onClose, onStageChange, onDelete }) {
+function LeadDetailModal({ lead, onClose, onStageChange, onArchive, onRestore }) {
   const cfg = stageConfig[lead.stage];
 
   const Row = ({ label, value, mono = false }) =>
@@ -142,12 +142,21 @@ function LeadDetailModal({ lead, onClose, onStageChange, onDelete }) {
             <button onClick={onClose} className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-50 transition-colors">
               Close
             </button>
-            <button
-              onClick={() => { if (window.confirm('Delete this lead?')) { onDelete(lead._id); onClose(); } }}
-              className="text-sm border border-red-200 text-red-500 hover:bg-red-50 rounded-lg px-4 py-2 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {lead.archived ? (
+              <button
+                onClick={() => { onRestore(lead._id); onClose(); }}
+                className="flex items-center gap-1.5 text-sm border border-green-200 text-green-600 hover:bg-green-50 rounded-lg px-4 py-2 transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" /> Restore
+              </button>
+            ) : (
+              <button
+                onClick={() => { onArchive(lead._id); onClose(); }}
+                className="flex items-center gap-1.5 text-sm border border-orange-200 text-orange-500 hover:bg-orange-50 rounded-lg px-4 py-2 transition-colors"
+              >
+                <Archive className="w-4 h-4" /> Archive
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -347,7 +356,7 @@ function ConvertToBookingModal({ lead, onClose, onConverted }) {
 }
 
 // ─── Lead Card ────────────────────────────────────────────────────────────────
-function LeadCard({ lead, onStageChange, onDelete, onConfirm, onViewDetail }) {
+function LeadCard({ lead, onStageChange, onArchive, onRestore, onConfirm, onViewDetail }) {
   const [confirming, setConfirming] = React.useState(false);
   const cfg = stageConfig[lead.stage];
 
@@ -374,10 +383,17 @@ function LeadCard({ lead, onStageChange, onDelete, onConfirm, onViewDetail }) {
             className="text-gray-300 hover:text-primary-500 transition-colors p-0.5" title="View full details">
             <Eye className="w-4 h-4" />
           </button>
-          <button onClick={() => onDelete(lead._id)}
-            className="text-gray-300 hover:text-red-400 transition-colors p-0.5">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {lead.archived ? (
+            <button onClick={() => onRestore(lead._id)}
+              className="text-gray-300 hover:text-green-500 transition-colors p-0.5" title="Restore lead">
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={() => onArchive(lead._id)}
+              className="text-gray-300 hover:text-orange-400 transition-colors p-0.5" title="Archive lead">
+              <Archive className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -450,15 +466,25 @@ export default function Leads() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterSource, setFilterSource] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [bookingModal, setBookingModal] = useState(null);
   const [detailLead, setDetailLead] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const params = {};
+      if (search)         params.search       = search;
+      if (filterSource)   params.source       = filterSource;
+      if (filterDateFrom) params.dateFrom     = filterDateFrom;
+      if (filterDateTo)   params.dateTo       = filterDateTo;
+      if (showArchived)   params.showArchived = 'true';
       const [leadsRes, statsRes] = await Promise.all([
-        leadsAPI.getAll(search ? { search } : {}),
+        leadsAPI.getAll(params),
         leadsAPI.getStats(),
       ]);
       setLeads(leadsRes.data.data);
@@ -468,7 +494,15 @@ export default function Leads() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, filterSource, filterDateFrom, filterDateTo, showArchived]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilterSource('');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+  };
+  const hasFilters = search || filterSource || filterDateFrom || filterDateTo;
 
   useEffect(() => {
     const t = setTimeout(fetchData, search ? 400 : 0);
@@ -589,15 +623,56 @@ export default function Leads() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this lead?')) return;
+  const handleArchive = async (id) => {
+    if (!window.confirm('Archive this lead? It will be saved for future reference and can be restored later.')) return;
     try {
-      await leadsAPI.delete(id);
+      await leadsAPI.archive(id);
       setLeads((prev) => prev.filter((l) => l._id !== id));
-      toast.success('Lead deleted');
+      toast.success('Lead archived — data saved for future reference');
+      fetchData();
     } catch {
-      toast.error('Failed to delete');
+      toast.error('Failed to archive');
     }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      await leadsAPI.restore(id);
+      setLeads((prev) => prev.filter((l) => l._id !== id));
+      toast.success('Lead restored to active leads');
+      fetchData();
+    } catch {
+      toast.error('Failed to restore');
+    }
+  };
+
+  const exportCSV = () => {
+    if (!leads.length) { toast.error('No leads to export'); return; }
+    const headers = ['Name', 'Phone', 'Service', 'Stage', 'Source', 'Quoted (₹)', 'Scheduled Date', 'Time Slot', 'Address', 'Notes', 'Follow Up Date', 'Booking ID', 'Lead Received'];
+    const rows = leads.map((l) => [
+      l.name,
+      l.phone,
+      l.serviceInterest || '',
+      l.stage,
+      l.source,
+      l.quotedAmount || 0,
+      l.scheduledDate ? new Date(l.scheduledDate).toLocaleDateString('en-IN') : '',
+      l.timeSlot || '',
+      (l.address || '').replace(/,/g, ';'),
+      (l.notes || '').replace(/[\n,]/g, ' '),
+      l.followUpDate ? new Date(l.followUpDate).toLocaleDateString('en-IN') : '',
+      l.convertedBookingId || '',
+      new Date(l.createdAt).toLocaleString('en-IN'),
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `leads_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${leads.length} leads`);
   };
 
   const leadsByStage = (stageKey) => leads.filter((l) => l.stage === stageKey);
@@ -610,7 +685,8 @@ export default function Leads() {
           lead={detailLead}
           onClose={() => setDetailLead(null)}
           onStageChange={(id, stage) => { setDetailLead(null); handleStageChange(id, stage); }}
-          onDelete={(id) => { setDetailLead(null); handleDelete(id); }}
+          onArchive={(id) => { setDetailLead(null); handleArchive(id); }}
+          onRestore={(id) => { setDetailLead(null); handleRestore(id); }}
         />
       )}
       {bookingModal && (
@@ -630,15 +706,25 @@ export default function Leads() {
             <span className="font-bold text-gray-900">{stats?.byStage?.[s.key] ?? 0}</span>
           </div>
         ))}
+        {stats?.archived > 0 && (
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className={`card px-4 py-3 flex items-center gap-3 border-dashed transition-colors ${showArchived ? 'border-orange-300 bg-orange-50' : 'hover:border-gray-300'}`}
+          >
+            <Archive className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-sm text-gray-500">Archived</span>
+            <span className="font-bold text-gray-700">{stats.archived}</span>
+          </button>
+        )}
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search leads by name or phone..."
+            placeholder="Search by name, phone, service..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300"
@@ -647,10 +733,64 @@ export default function Leads() {
         <button onClick={fetchData} disabled={loading} className="btn-ghost border border-gray-200 text-sm gap-2">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
+        <button onClick={exportCSV} className="btn-ghost border border-gray-200 text-sm gap-2" title="Export to CSV">
+          <Download className="w-4 h-4" /> Export
+        </button>
         <button onClick={() => setShowAdd(true)} className="btn-primary text-sm gap-2">
           <Plus className="w-4 h-4" /> Add Lead
         </button>
       </div>
+
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-2 mb-5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+        <span className="text-xs font-medium text-gray-500 mr-1">Filters:</span>
+        <select
+          value={filterSource}
+          onChange={(e) => setFilterSource(e.target.value)}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 text-gray-600"
+        >
+          <option value="">All Sources</option>
+          {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400">From</span>
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 text-gray-600"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400">To</span>
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 text-gray-600"
+          />
+        </div>
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="ml-auto flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            <X className="w-3 h-3" /> Clear filters
+          </button>
+        )}
+        {hasFilters && (
+          <span className="text-xs text-primary-600 font-medium">{leads.length} result{leads.length !== 1 ? 's' : ''}</span>
+        )}
+      </div>
+
+      {/* Archived mode banner */}
+      {showArchived && (
+        <div className="flex items-center gap-3 mb-4 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-700">
+          <Archive className="w-4 h-4 shrink-0" />
+          <span>Showing <strong>archived leads</strong> — these are saved for future reference. Click <RotateCcw className="w-3 h-3 inline" /> to restore a lead to active.</span>
+          <button onClick={() => setShowArchived(false)} className="ml-auto text-orange-500 hover:text-orange-700"><X className="w-4 h-4" /></button>
+        </div>
+      )}
 
       {/* Kanban columns */}
       {loading ? (
@@ -670,7 +810,8 @@ export default function Leads() {
                     key={lead._id}
                     lead={lead}
                     onStageChange={handleStageChange}
-                    onDelete={handleDelete}
+                    onArchive={handleArchive}
+                    onRestore={handleRestore}
                     onConfirm={handleConfirm}
                     onViewDetail={setDetailLead}
                   />

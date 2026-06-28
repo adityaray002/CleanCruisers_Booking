@@ -97,19 +97,21 @@ export const customersAPI = {
 };
 
 export const leadsAPI = {
-  getAll: (params) => api.get('/leads', { params }),
-  create: (data) => api.post('/leads', data),
-  update: (id, data) => api.put(`/leads/${id}`, data),
-  delete: (id) => api.delete(`/leads/${id}`),
-  getStats: () => api.get('/leads/stats'),
-  confirm: (id) => api.post(`/leads/${id}/confirm`),
-  convert: (id, data) => api.post(`/leads/${id}/convert`, data),
+  getAll:   (params) => api.get('/leads', { params }),
+  create:   (data)   => api.post('/leads', data),
+  update:   (id, data) => api.put(`/leads/${id}`, data),
+  archive:  (id)     => api.patch(`/leads/${id}/archive`),
+  restore:  (id)     => api.patch(`/leads/${id}/restore`),
+  getStats: ()       => api.get('/leads/stats'),
+  confirm:  (id)     => api.post(`/leads/${id}/confirm`),
+  convert:  (id, data) => api.post(`/leads/${id}/convert`, data),
 };
 
 export const inboxAPI = {
-  getAll:      ()                  => api.get('/inbox'),
-  getMessages: (phone, businessId) => api.get(`/inbox/${phone}`, { params: { businessId } }),
-  sendReply:   (phone, data)       => api.post(`/inbox/${phone}/reply`, data),
+  getAll:       ()                  => api.get('/inbox'),
+  getMessages:  (phone, businessId) => api.get(`/inbox/${phone}`, { params: { businessId } }),
+  updateLabel:  (phone, data)       => api.patch(`/inbox/${phone}/label`, data),
+  sendReply:    (phone, data)       => api.post(`/inbox/${phone}/reply`, data),
 };
 
 export const subscriptionsAPI = {

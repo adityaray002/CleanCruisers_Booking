@@ -2,12 +2,20 @@ const Lead = require('../models/Lead');
 
 const getLeads = async (req, res, next) => {
   try {
-    const { stage, search } = req.query;
+    const { stage, source, search, dateFrom, dateTo, showArchived } = req.query;
     const filter = {};
-    if (stage) filter.stage = stage;
+    // By default hide archived leads; show them only when explicitly requested
+    filter.archived = showArchived === 'true' ? true : { $ne: true };
+    if (stage)  filter.stage  = stage;
+    if (source) filter.source = source;
     if (search) {
       const q = new RegExp(search, 'i');
-      filter.$or = [{ name: q }, { phone: q }];
+      filter.$or = [{ name: q }, { phone: q }, { serviceInterest: q }];
+    }
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo)   filter.createdAt.$lte = new Date(new Date(dateTo).setHours(23, 59, 59, 999));
     }
     const leads = await Lead.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, count: leads.length, data: leads });
@@ -44,11 +52,22 @@ const updateLead = async (req, res, next) => {
   }
 };
 
-const deleteLead = async (req, res, next) => {
+// Soft-delete — keeps data in DB for future reference
+const archiveLead = async (req, res, next) => {
   try {
-    const lead = await Lead.findByIdAndDelete(req.params.id);
+    const lead = await Lead.findByIdAndUpdate(req.params.id, { archived: true }, { new: true });
     if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
-    res.json({ success: true, message: 'Lead deleted' });
+    res.json({ success: true, message: 'Lead archived' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const restoreLead = async (req, res, next) => {
+  try {
+    const lead = await Lead.findByIdAndUpdate(req.params.id, { archived: false }, { new: true });
+    if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+    res.json({ success: true, data: lead });
   } catch (err) {
     next(err);
   }
@@ -56,12 +75,16 @@ const deleteLead = async (req, res, next) => {
 
 const getLeadStats = async (req, res, next) => {
   try {
-    const [total, byStage] = await Promise.all([
-      Lead.countDocuments(),
-      Lead.aggregate([{ $group: { _id: '$stage', count: { $sum: 1 } } }]),
+    const [total, byStage, archivedCount] = await Promise.all([
+      Lead.countDocuments({ archived: { $ne: true } }),
+      Lead.aggregate([
+        { $match: { archived: { $ne: true } } },
+        { $group: { _id: '$stage', count: { $sum: 1 } } },
+      ]),
+      Lead.countDocuments({ archived: true }),
     ]);
     const stageMap = Object.fromEntries(byStage.map((s) => [s._id, s.count]));
-    res.json({ success: true, data: { total, byStage: stageMap } });
+    res.json({ success: true, data: { total, byStage: stageMap, archived: archivedCount } });
   } catch (err) {
     next(err);
   }
@@ -230,4 +253,4 @@ const convertToBooking = async (req, res, next) => {
   }
 };
 
-module.exports = { getLeads, createLead, updateLead, deleteLead, getLeadStats, createWebsiteLead, confirmLead, convertToBooking };
+module.exports = { getLeads, createLead, updateLead, archiveLead, restoreLead, getLeadStats, createWebsiteLead, confirmLead, convertToBooking };

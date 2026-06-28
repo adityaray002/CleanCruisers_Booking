@@ -1,6 +1,7 @@
 const Message      = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const Lead         = require('../models/Lead');
+const ChatLabel    = require('../models/ChatLabel');
 
 // GET /api/inbox — list all conversations grouped by phone+bizId
 const getConversations = async (req, res) => {
@@ -20,8 +21,11 @@ const getConversations = async (req, res) => {
     const enriched = await Promise.all(convos.map(async (c) => {
       const phone = c._id.customerPhone;
       const bizId = c._id.businessId;
-      const lead  = await Lead.findOne({ phone }).sort({ createdAt: -1 }).select('name stage serviceInterest convertedBookingId').lean();
-      const conv  = await Conversation.findOne({ customerPhone: phone, businessId: bizId }).select('step').lean();
+      const [lead, conv, chatLabel] = await Promise.all([
+        Lead.findOne({ phone }).sort({ createdAt: -1 }).select('name stage serviceInterest convertedBookingId').lean(),
+        Conversation.findOne({ customerPhone: phone, businessId: bizId }).select('step').lean(),
+        ChatLabel.findOne({ customerPhone: phone, businessId: bizId }).lean(),
+      ]);
       return {
         customerPhone: phone,
         businessId:    bizId,
@@ -29,7 +33,9 @@ const getConversations = async (req, res) => {
         lastMessageAt: c.lastMessageAt,
         lastDirection: c.lastDirection,
         lead,
-        botStep: conv?.step,
+        botStep:   conv?.step,
+        chatLabel: chatLabel?.label  || null,
+        chatNote:  chatLabel?.note   || '',
       };
     }));
 
@@ -44,12 +50,35 @@ const getMessages = async (req, res) => {
   try {
     const { phone } = req.params;
     const { businessId } = req.query;
-    const messages = await Message.find({ customerPhone: phone, ...(businessId && { businessId }) })
-      .sort({ createdAt: 1 })
-      .lean();
-    const lead = await Lead.findOne({ phone }).sort({ createdAt: -1 }).lean();
-    const conv = await Conversation.findOne({ customerPhone: phone, ...(businessId && { businessId }) }).lean();
-    res.json({ success: true, data: { messages, lead, conv } });
+    const [messages, lead, conv, chatLabel] = await Promise.all([
+      Message.find({ customerPhone: phone, ...(businessId && { businessId }) }).sort({ createdAt: 1 }).lean(),
+      Lead.findOne({ phone }).sort({ createdAt: -1 }).lean(),
+      Conversation.findOne({ customerPhone: phone, ...(businessId && { businessId }) }).lean(),
+      ChatLabel.findOne({ customerPhone: phone, ...(businessId && { businessId }) }).lean(),
+    ]);
+    res.json({ success: true, data: { messages, lead, conv, chatLabel } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// PATCH /api/inbox/:phone/label — set label and note for a conversation
+const updateChatLabel = async (req, res) => {
+  try {
+    const { phone } = req.params;
+    const { businessId, label, note } = req.body;
+    if (!businessId) return res.status(400).json({ success: false, message: 'businessId required' });
+
+    const update = {};
+    if (label !== undefined) update.label = label || null;
+    if (note  !== undefined) update.note  = note;
+
+    const result = await ChatLabel.findOneAndUpdate(
+      { customerPhone: phone, businessId },
+      { $set: update },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -73,10 +102,20 @@ const sendReply = async (req, res) => {
     await sendText(phone, text, phoneNumberId, token);
     await Message.create({ customerPhone: phone, businessId, direction: 'outbound', text, sentBy: 'admin' });
 
+    // Auto-set label to 'active' when admin replies, if label is null or closed
+    const existing = await ChatLabel.findOne({ customerPhone: phone, businessId });
+    if (!existing?.label || existing.label === 'closed') {
+      await ChatLabel.findOneAndUpdate(
+        { customerPhone: phone, businessId },
+        { $set: { label: 'active' } },
+        { upsert: true }
+      );
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-module.exports = { getConversations, getMessages, sendReply };
+module.exports = { getConversations, getMessages, updateChatLabel, sendReply };

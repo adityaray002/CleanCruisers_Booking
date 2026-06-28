@@ -83,20 +83,18 @@ const sofaShineConfig = {
   ],
   subServices: {
     'Home Cleaning': [
-      // Sofa — seat-based pricing (₹110/seat)
-      { id: 'Sofa — 1 Seat',   price: 110, section: '🛋️ Sofa Cleaning', desc: '₹110' },
+      // Sofa — seat-based pricing (max 5 rows in this section)
       { id: 'Sofa — 2 Seats',  price: 220, section: '🛋️ Sofa Cleaning', desc: '₹220' },
       { id: 'Sofa — 3 Seats',  price: 330, section: '🛋️ Sofa Cleaning', desc: '₹330' },
       { id: 'Sofa — 4 Seats',  price: 440, section: '🛋️ Sofa Cleaning', desc: '₹440' },
-      { id: 'Sofa — 5 Seats',  price: 550, section: '🛋️ Sofa Cleaning', desc: '₹550' },
       { id: 'Sofa — L-Shape',  price: 600, section: '🛋️ Sofa Cleaning', desc: '₹600' },
-      { id: 'Sofa — 6+ Seats', price:   0, section: '🛋️ Sofa Cleaning', desc: 'Custom price', askCount: true },
-      // Other items — quantity-based
-      { id: 'Mattress',          price: 299, section: '🏠 Other Items', desc: '₹299/piece', askQty: true },
-      { id: 'Carpet',            price: 399, section: '🏠 Other Items', desc: '₹399/piece', askQty: true },
-      { id: 'Dining Chair',      price:  90, section: '🏠 Other Items', desc: '₹90/chair',  askQty: true },
-      { id: 'Office Chair',      price: 120, section: '🏠 Other Items', desc: '₹120/chair', askQty: true },
-      { id: 'Curtains (pair)',   price: 149, section: '🏠 Other Items', desc: '₹149/pair',  askQty: true },
+      { id: 'Sofa — 5+ Seats', price:   0, section: '🛋️ Sofa Cleaning', desc: '₹100/seat', askCount: true },
+      // Other items — quantity-based (max 5 rows — total stays at 10, WhatsApp limit)
+      { id: 'Mattress',        price: 299, section: '🏠 Other Items', desc: '₹299/piece', askQty: true },
+      { id: 'Carpet',          price: 399, section: '🏠 Other Items', desc: '₹399/piece', askQty: true },
+      { id: 'Dining Chair',    price:  90, section: '🏠 Other Items', desc: '₹90/chair',  askQty: true },
+      { id: 'Office Chair',    price: 120, section: '🏠 Other Items', desc: '₹120/chair', askQty: true },
+      { id: 'Curtains (pair)', price: 149, section: '🏠 Other Items', desc: '₹149/pair',  askQty: true },
     ],
     'Deep Cleaning': [
       { id: 'Bathroom Cleaning', price: 299,  desc: '₹299 · 1-2 hrs' },
@@ -790,12 +788,12 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
       // 6+ seat sofa — ask for seat count
       if (match.askCount) {
-        await save(conv, 'AWAITING_SEAT_COUNT', { pendingSubService: match.id, pendingUnitPrice: 90 });
+        await save(conv, 'AWAITING_SEAT_COUNT', { pendingSubService: match.id, pendingUnitPrice: 100 });
         await sendText(from,
           `🛋️ *${match.id}*\n\n` +
           `Apne sofa mein total kitne seats hain?\n` +
-          `_(Sirf number type karein — jaise: 7 ya 10)_\n\n` +
-          `💰 Rate: ₹90 per seat`,
+          `_(Sirf number type karein — jaise: 5, 6, 7 ya 10)_\n\n` +
+          `💰 Rate: ₹100 per seat`,
           phoneNumberId, token
         );
         break;

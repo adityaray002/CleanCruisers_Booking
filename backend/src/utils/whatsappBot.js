@@ -385,39 +385,19 @@ const askDate = async (to, phoneNumberId, token) => {
   );
 };
 
-// Time group selection (Morning / Afternoon / Evening)
-const sendTimeGroups = async (to, date, slots, phoneNumberId, token) => {
-  const groups  = groupSlots(slots);
-  const rows    = [];
-  if (groups.morning.length)   rows.push({ id: 'TG_MORNING',   title: '🌅 Morning (6–12 PM)',  description: `${groups.morning.length} slots available` });
-  if (groups.afternoon.length) rows.push({ id: 'TG_AFTERNOON', title: '☀️ Afternoon (12–5PM)', description: `${groups.afternoon.length} slots available` });
-  if (groups.evening.length)   rows.push({ id: 'TG_EVENING',   title: '🌆 Evening (5–9 PM)',   description: `${groups.evening.length} slots available` });
-
-  if (!rows.length) return false;
-
-  await sendList(to,
-    `🕐 *${fmtDate(date)}*\n\nKaunse time mein aata hai aapko? 👇`,
-    `Time Group Chunein`,
-    [{ title: '⏰ Time of Day', rows }],
+// Simple time preference — 3 buttons, no slot IDs, no special chars
+const askTimePreference = async (to, date, phoneNumberId, token) => {
+  await sendButtons(to,
+    `✅ *${fmtDate(date)}* — Perfect!\n\n` +
+    `🕐 *Kaunsa time prefer karte ho?*\n\n` +
+    `_(Exact time hamaari team booking confirm hone ke baad batayegi)_`,
+    [
+      { id: 'PREF_MORNING',   title: '🌅 Morning (9AM–1PM)' },
+      { id: 'PREF_AFTERNOON', title: '☀️ Afternoon (1–5PM)' },
+      { id: 'PREF_EVENING',   title: '🌆 Evening (5–8PM)' },
+    ],
     phoneNumberId, token
   );
-  return true;
-};
-
-// Specific slot selection within a time group
-const askSpecificTime = async (to, date, slots, group, phoneNumberId, token) => {
-  const groups  = groupSlots(slots);
-  const grouped = groups[group] || [];
-  if (!grouped.length) return false;
-
-  const rows = grouped.map((s) => ({ id: s, title: s }));
-  await sendList(to,
-    `✅ Great choice!\n\n*${fmtDate(date)}* ke liye exact time chunein 👇`,
-    `Slot Chunein`,
-    [{ title: '⏰ Available Slots', rows }],
-    phoneNumberId, token
-  );
-  return true;
 };
 
 // ── Address, name, confirmation ───────────────────────────────────────────────
@@ -894,57 +874,33 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         await sendText(from, `⚠️ Date samajh nahi aaya. Kripya *DD/MM/YYYY* format mein likhein — jaise: *25/07/2025*`, phoneNumberId, token);
         break;
       }
-      const slots = await getAvailableSlots(date);
-      await save(conv, 'AWAITING_TIME_GROUP', {
-        date,
-        allSlots: slots.map((s) => ({ slot: s.slot, available: s.available })),
-      });
-      const ok = await sendTimeGroups(from, date, slots, phoneNumberId, token);
-      if (!ok) {
-        await sendText(from, `😔 *${fmtDate(date)}* ke liye koi slot available nahi hai. Koi aur date try karein!`, phoneNumberId, token);
-        await save(conv, 'AWAITING_DATE');
-        await askDate(from, phoneNumberId, token);
-      }
+      await save(conv, 'AWAITING_TIME', { date });
+      await askTimePreference(from, date, phoneNumberId, token);
       break;
     }
 
-    // ── Time Group Selection ──────────────────────────────────────────────────
+    // ── Time Group (legacy state — redirect to preference) ────────────────────
     case 'AWAITING_TIME_GROUP': {
-      const groupMap = { TG_MORNING: 'morning', TG_AFTERNOON: 'afternoon', TG_EVENING: 'evening' };
-      const group    = groupMap[text];
-
-      if (!group) {
-        const slots = conv.data.allSlots || [];
-        await sendTimeGroups(from, new Date(conv.data.date), slots, phoneNumberId, token);
-        break;
-      }
-
-      await save(conv, 'AWAITING_TIME', { timeGroup: group });
-      const ok = await askSpecificTime(
-        from, new Date(conv.data.date), conv.data.allSlots || [], group, phoneNumberId, token
-      );
-      if (!ok) {
-        await sendText(from, `😔 Is time mein slots nahi hain. Koi aur time group chunein.`, phoneNumberId, token);
-        await sendTimeGroups(from, new Date(conv.data.date), conv.data.allSlots || [], phoneNumberId, token);
-        await save(conv, 'AWAITING_TIME_GROUP');
-      }
+      await save(conv, 'AWAITING_TIME');
+      await askTimePreference(from, new Date(conv.data.date || Date.now()), phoneNumberId, token);
       break;
     }
 
-    // ── Specific Time Slot ────────────────────────────────────────────────────
+    // ── Time Preference ───────────────────────────────────────────────────────
     case 'AWAITING_TIME': {
-      const allSlots = conv.data.allSlots || [];
-      const match    = allSlots.find((s) => s.slot === text && s.available);
+      const prefMap = {
+        PREF_MORNING:   'Morning (9AM - 1PM)',
+        PREF_AFTERNOON: 'Afternoon (1PM - 5PM)',
+        PREF_EVENING:   'Evening (5PM - 8PM)',
+      };
+      const timeSlot = prefMap[text];
 
-      if (!match) {
-        // Re-show the group slots
-        const group = conv.data.timeGroup || 'morning';
-        await sendText(from, `⚠️ Yeh slot available nahi. Dobara choose karein:`, phoneNumberId, token);
-        await askSpecificTime(from, new Date(conv.data.date), allSlots, group, phoneNumberId, token);
+      if (!timeSlot) {
+        await askTimePreference(from, new Date(conv.data.date || Date.now()), phoneNumberId, token);
         break;
       }
 
-      await save(conv, 'AWAITING_ADDRESS', { timeSlot: text });
+      await save(conv, 'AWAITING_ADDRESS', { timeSlot });
       await askAddress(from, phoneNumberId, token);
       break;
     }

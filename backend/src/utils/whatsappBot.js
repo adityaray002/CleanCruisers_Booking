@@ -4,7 +4,7 @@ const Message      = require('../models/Message');
 const { sendText: _sendText, sendButtons: _sendButtons, sendList: _sendList } = require('./metaWhatsApp');
 const { getAvailableSlots } = require('./slotManager');
 
-// Track phone → businessId so outbound bot messages can be saved to inbox
+// ── Inbox message saving (outbound bot → WhatsApp Inbox) ─────────────────────
 const _phoneBizMap = new Map();
 
 const sendText = async (to, text, phoneNumberId, token) => {
@@ -31,88 +31,147 @@ const sendList = async (to, header, body, sections, phoneNumberId, token) => {
   }
 };
 
+// ── Static content ────────────────────────────────────────────────────────────
+
+const REVIEWS = [
+  { name: 'Priya M., Noida',   star: '⭐⭐⭐⭐⭐', text: '"SofaShine ne mera 5-seater sofa bilkul naya kar diya! Team bohot professional thi. 100% recommend!"' },
+  { name: 'Rohit K., Delhi',   star: '⭐⭐⭐⭐⭐', text: '"Kitchen deep clean ekdum perfect. Eco-friendly chemicals use kiye, smell bhi nahi aayi. Bahut satisfied!"' },
+  { name: 'Anita S., Gurgaon', star: '⭐⭐⭐⭐⭐', text: '"Pay after service wali policy ne trust build kiya. Team time pe aayi, kaam excellent tha!"' },
+  { name: 'Vikram T., Noida',  star: '⭐⭐⭐⭐⭐', text: '"3 sofas + carpet sab ek din mein done. Price bhi fair tha. Definitely book karunga dobara!"' },
+];
+
+const AREAS_TEXT =
+  `📍 *Hamare Service Areas*\n━━━━━━━━━━━━━━━\n\n` +
+  `✅ *Noida:* Sector 18, 62, 63, 77, 78, 100, 137\n` +
+  `✅ *Greater Noida:* Knowledge Park, Gamma, Beta\n` +
+  `✅ *Gurgaon:* DLF, Sohna Road, Golf Course Ext\n` +
+  `✅ *Delhi:* South, West, East, Central Delhi\n` +
+  `✅ *Ghaziabad:* Indirapuram, Vaishali, Raj Nagar\n` +
+  `✅ *Faridabad:* NIT, Sector 14, 21\n\n` +
+  `🚀 _Apna area nahi dikh raha? Message karein — hum dekhenge!_ 🙏`;
+
+const OFFERS_TEXT =
+  `🎁 *Aaj Ke Special Offers!*\n━━━━━━━━━━━━━━━\n\n` +
+  `🔥 *Bundle Deal:* Sofa + Mattress → *15% OFF*\n` +
+  `🍳 *Kitchen + Bathroom:* Sirf ₹899 _(save ₹99)_\n` +
+  `🆕 *Pehli Booking:* ₹100 instant discount\n` +
+  `📅 *Weekday Special:* Mon-Thu → *10% extra off*\n` +
+  `👨‍👩‍👧 *Refer & Earn:* ₹200 off per referral\n\n` +
+  `⏰ _Offers limited time ke liye hain. Abhi book karein!_`;
+
+const FAQ = {
+  'Pricing & Payment': `💰 Rates market se 20% kam hain!\n\n🛋️ Sofa: ₹110/seat se shuru\n🏠 Kitchen: ₹699\n🏡 1 BHK: ₹2499\n\n💳 *Payment SIRF kaam complete hone ke baad!*\nCash, UPI, card — sab accept hota hai. Koi advance nahi!`,
+  'How Long It Takes': `⏱️ *Service Duration:*\n\n🛋️ Sofa (2-3 seat): 1-1.5 ghanta\n🛏️ Mattress: 30-45 min\n🏠 Kitchen: 2-3 ghante\n🏡 Full 1 BHK: 4-5 ghante\n🏡 Full 2 BHK: 6-7 ghante\n\nHum time waaste nahi karte! ⚡`,
+  'Chemicals & Safety': `🌿 *100% Eco-Friendly Chemicals*\n\nHamare products:\n✅ Bachon ke liye safe\n✅ Pets ke liye safe\n✅ Koi strong smell nahi\n✅ ISO certified cleaning agents\n✅ Surfaces damage nahi karte\n\nAap ghar mein reh sakte ho service ke dauran! 🏠`,
+  'Cancellation Policy': `📋 *Flexible Cancellation:*\n\n✅ *2 ghante pehle:* Free cancel/reschedule\n⚠️ *1-2 ghante:* 50% cancellation fee\n❌ *Last minute:* Full charge\n\n_WhatsApp pe message karein — seedha response milega!_ 💬`,
+  'Contact & Support': `📞 *Hamare Saath Baat Karein:*\n\n💬 WhatsApp: Is number pe message karein\n⏰ Response time: 15 minutes\n🕘 Hours: 9 AM – 9 PM, 7 days\n\n_Emergency? Seedha call karein — hum available hain!_ 🙏`,
+};
+
 // ── Business config ───────────────────────────────────────────────────────────
+
 const sofaShineConfig = {
-  id:    'sofashine',
-  name:  'SofaShine',
-  token: () => process.env.SOFASHINE_META_TOKEN,
+  id:      'sofashine',
+  name:    'SofaShine',
+  tagline: 'Expert Cleaning at Your Doorstep',
+  token:   () => process.env.SOFASHINE_META_TOKEN,
   services: [
-    { id: 'Home Cleaning',      emoji: '🛋️', desc: 'Sofa, Carpet, Bed, Dining Chairs' },
+    { id: 'Home Cleaning',      emoji: '🛋️', desc: 'Sofa, Mattress, Carpet, Chairs' },
     { id: 'Deep Cleaning',      emoji: '🏠', desc: 'Bathroom, Kitchen, Full Home, Office' },
-    { id: 'Appliance Cleaning', emoji: '🔧', desc: 'Microwave, Fridge, Fan, Gas Stove' },
+    { id: 'Appliance Cleaning', emoji: '🔧', desc: 'AC, Fridge, Microwave, Fan, Gas Stove' },
     { id: 'Pest Control',       emoji: '🐜', desc: 'Cockroach, Ant & Insect Control' },
-    { id: 'Other / Custom',     emoji: '💬', desc: 'Apni specific requirement batayein' },
+    { id: 'Other / Custom',     emoji: '💬', desc: 'Custom requirement — bata ke dekho!' },
   ],
   subServices: {
     'Home Cleaning': [
-      { id: 'Sofa — 2 Seater',   price: 220 },
-      { id: 'Sofa — 3 Seater',   price: 330 },
-      { id: 'Sofa — L-Shape',    price: 550 },
-      { id: 'Carpet — Small',    price: 299 },
-      { id: 'Carpet — Medium',   price: 499 },
-      { id: 'Carpet — Large',    price: 799 },
-      { id: 'Bed Cleaning',      price: 149 },
-      { id: 'Dining — 4 Chairs', price: 360 },
+      // Sofa — seat-based pricing (₹110/seat)
+      { id: 'Sofa — 1 Seat',   price: 110, section: '🛋️ Sofa Cleaning', desc: '₹110' },
+      { id: 'Sofa — 2 Seats',  price: 220, section: '🛋️ Sofa Cleaning', desc: '₹220' },
+      { id: 'Sofa — 3 Seats',  price: 330, section: '🛋️ Sofa Cleaning', desc: '₹330' },
+      { id: 'Sofa — 4 Seats',  price: 440, section: '🛋️ Sofa Cleaning', desc: '₹440' },
+      { id: 'Sofa — 5 Seats',  price: 550, section: '🛋️ Sofa Cleaning', desc: '₹550' },
+      { id: 'Sofa — L-Shape',  price: 600, section: '🛋️ Sofa Cleaning', desc: '₹600' },
+      { id: 'Sofa — 6+ Seats', price:   0, section: '🛋️ Sofa Cleaning', desc: 'Custom price', askCount: true },
+      // Other items — quantity-based
+      { id: 'Mattress',          price: 299, section: '🏠 Other Items', desc: '₹299/piece', askQty: true },
+      { id: 'Carpet',            price: 399, section: '🏠 Other Items', desc: '₹399/piece', askQty: true },
+      { id: 'Dining Chair',      price:  90, section: '🏠 Other Items', desc: '₹90/chair',  askQty: true },
+      { id: 'Office Chair',      price: 120, section: '🏠 Other Items', desc: '₹120/chair', askQty: true },
+      { id: 'Curtains (pair)',   price: 149, section: '🏠 Other Items', desc: '₹149/pair',  askQty: true },
     ],
     'Deep Cleaning': [
-      { id: 'Bathroom Cleaning', price: 299  },
-      { id: 'Kitchen Cleaning',  price: 699  },
-      { id: '1 BHK Full Home',   price: 2499 },
-      { id: 'Office Deep Clean', price: 1999 },
+      { id: 'Bathroom Cleaning', price: 299,  desc: '₹299 · 1-2 hrs' },
+      { id: 'Kitchen Cleaning',  price: 699,  desc: '₹699 · 2-3 hrs' },
+      { id: '1 BHK Full Home',   price: 2499, desc: '₹2499 · 4-5 hrs' },
+      { id: '2 BHK Full Home',   price: 3499, desc: '₹3499 · 6-7 hrs' },
+      { id: '3 BHK Full Home',   price: 4499, desc: '₹4499 · 7-8 hrs' },
+      { id: 'Office Deep Clean', price: 1999, desc: '₹1999 · area based' },
     ],
     'Appliance Cleaning': [
-      { id: 'Microwave',         price: 149 },
-      { id: 'Gas Stove',         price: 99  },
-      { id: 'Refrigerator',      price: 299 },
-      { id: 'Ceiling Fan',       price: 59  },
-      { id: 'Exhaust Fan',       price: 79  },
-      { id: 'Kitchen Window',    price: 199 },
+      { id: 'AC Service',        price: 349, desc: '₹349/unit',  askQty: true },
+      { id: 'Refrigerator',      price: 299, desc: '₹299' },
+      { id: 'Microwave',         price: 149, desc: '₹149' },
+      { id: 'Gas Stove',         price:  99, desc: '₹99' },
+      { id: 'Ceiling Fan',       price:  59, desc: '₹59/fan',   askQty: true },
+      { id: 'Exhaust Fan',       price:  79, desc: '₹79' },
+      { id: 'Kitchen Window',    price: 199, desc: '₹199' },
     ],
     'Pest Control': [
-      { id: 'Pest Control',      price: 399 },
+      { id: 'Cockroach Control', price: 499, desc: '₹499 · 1 BHK' },
+      { id: 'Full Pest Control', price: 799, desc: '₹799 · full home' },
+      { id: 'Ant Treatment',     price: 349, desc: '₹349' },
+    ],
+  },
+};
+
+const cleanCruisersConfig = {
+  id:    'cleancruisers',
+  name:  'CleanCruisers',
+  token: () => process.env.CLEANCRUISERS_META_TOKEN,
+  services: [
+    { id: 'One-Time Wash',   emoji: '🚗', desc: 'Exterior + Interior wash' },
+    { id: 'Waterless Clean', emoji: '💧', desc: 'Eco waterless cleaning' },
+    { id: 'Premium Add-ons', emoji: '✨', desc: 'Interior, engine, seat shampoo' },
+    { id: 'Complete Care',   emoji: '🏆', desc: '3x bundle — save 20%' },
+  ],
+  subServices: {
+    'One-Time Wash': [
+      { id: 'Hatchback — Exterior', price: 349, desc: '₹349' },
+      { id: 'Hatchback — Full',     price: 449, desc: '₹449' },
+      { id: 'Sedan — Exterior',     price: 349, desc: '₹349' },
+      { id: 'Sedan — Full',         price: 499, desc: '₹499' },
+      { id: 'SUV — Exterior',       price: 399, desc: '₹399' },
+      { id: 'SUV — Full',           price: 549, desc: '₹549' },
+    ],
+    'Waterless Clean': [
+      { id: 'Hatchback', price: 349, desc: '₹349' },
+      { id: 'Sedan',     price: 399, desc: '₹399' },
+      { id: 'SUV',       price: 449, desc: '₹449' },
+    ],
+    'Complete Care': [
+      { id: 'Hatchback (3x)', price: 1399, desc: '₹1399 — save ₹648' },
+      { id: 'Sedan (3x)',     price: 1499, desc: '₹1499 — save ₹798' },
+      { id: 'SUV (3x)',       price: 1599, desc: '₹1599 — save ₹798' },
+    ],
+    'Premium Add-ons': [
+      { id: 'Interior Deep Clean', price: 799, desc: '₹799' },
+      { id: 'Engine Bay Clean',    price: 599, desc: '₹599' },
+      { id: 'Seat Shampooing',     price: 999, desc: '₹999' },
     ],
   },
 };
 
 const BUSINESSES = {
-  [process.env.SOFASHINE_PHONE_NUMBER_ID]: sofaShineConfig,
-  '1245560968629574': sofaShineConfig, // Meta test number (Step 1 try it out)
-  [process.env.CLEANCRUISERS_PHONE_NUMBER_ID]: {
-    id:    'cleancruisers',
-    name:  'CleanCruisers',
-    token: () => process.env.CLEANCRUISERS_META_TOKEN,
-    services: [
-      { id: 'One-Time Wash',    emoji: '🚗' },
-      { id: 'Waterless Clean',  emoji: '💧' },
-      { id: 'Premium Add-ons',  emoji: '✨' },
-      { id: 'Complete Care',    emoji: '🏆' },
-    ],
-    subServices: {
-      'One-Time Wash':   [
-        { id: 'Hatchback - Exterior',        price: 349 },
-        { id: 'Hatchback - Both',            price: 449 },
-        { id: 'Sedan - Exterior',            price: 349 },
-        { id: 'Sedan - Both',                price: 499 },
-        { id: 'SUV - Exterior',              price: 399 },
-        { id: 'SUV - Both',                  price: 549 },
-      ],
-      'Waterless Clean': [
-        { id: 'Hatchback', price: 349 },
-        { id: 'Sedan',     price: 399 },
-        { id: 'SUV',       price: 449 },
-      ],
-      'Complete Care':   [
-        { id: 'Hatchback (3x washes)', price: 1399 },
-        { id: 'Sedan (3x washes)',     price: 1499 },
-        { id: 'SUV (3x washes)',       price: 1599 },
-      ],
-      'Premium Add-ons': [
-        { id: 'Interior Deep Clean',  price: 799  },
-        { id: 'Engine Bay Clean',     price: 599  },
-        { id: 'Seat Shampooing',      price: 999  },
-      ],
-    },
-  },
+  [process.env.SOFASHINE_PHONE_NUMBER_ID]:     sofaShineConfig,
+  '1245560968629574':                           sofaShineConfig, // Meta test number
+  [process.env.CLEANCRUISERS_PHONE_NUMBER_ID]: cleanCruisersConfig,
+};
+
+// Upsell suggestion per service (shown after first item added to cart)
+const UPSELL = {
+  'Home Cleaning':      { emoji: '🛏️', text: 'Sofa ke saath Mattress cleaning bhi add karein? Sirf ₹299 mein — ekdum naya feel aayega! ✨' },
+  'Deep Cleaning':      { emoji: '🚿', text: 'Kitchen ke saath Bathroom bhi karwayein? ₹299 extra mein — ek trip mein sab ho jaayega!' },
+  'Appliance Cleaning': { emoji: '🌀', text: 'AC ke saath Ceiling Fan bhi add karein sirf ₹59 mein! Team already aayegi toh sab clean ho jaayega.' },
+  'Pest Control':       { emoji: '🏠', text: 'Sirf ₹300 extra mein full home pest control upgrade karein — cockroach + ants + all insects!' },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,9 +180,7 @@ const getBusiness = (phoneNumberId) => BUSINESSES[phoneNumberId] || null;
 
 const getOrCreate = async (customerPhone, businessId) => {
   let conv = await Conversation.findOne({ customerPhone, businessId });
-  if (!conv) {
-    conv = await Conversation.create({ customerPhone, businessId, step: 'AWAITING_SERVICE' });
-  }
+  if (!conv) conv = await Conversation.create({ customerPhone, businessId, step: 'AWAITING_MAIN_MENU' });
   return conv;
 };
 
@@ -134,68 +191,193 @@ const save = async (conv, step, dataUpdate = {}) => {
   await conv.save();
 };
 
-// Parse date from customer text → returns Date | null
 const parseDate = (text) => {
   const t   = text.trim().toLowerCase();
   const now = new Date();
-  const ist = (d) => { d.setHours(d.getHours() + 5, d.getMinutes() + 30, 0, 0); return d; };
+  // Normalize IST date to midnight local for slot lookup
+  const startOfDay = (d) => { d.setHours(0, 0, 0, 0); return d; };
 
-  if (t === 'aaj' || t === 'today' || t === '1')    return ist(new Date(now));
-  if (t === 'kal' || t === 'tomorrow' || t === '2') { const d = new Date(now); d.setDate(d.getDate() + 1); return ist(d); }
-  if (t === 'parson' || t === '3')                  { const d = new Date(now); d.setDate(d.getDate() + 2); return ist(d); }
+  if (t === 'aaj'    || t === 'today'    || t === '1') return startOfDay(new Date(now));
+  if (t === 'kal'    || t === 'tomorrow' || t === '2') { const d = new Date(now); d.setDate(d.getDate() + 1); return startOfDay(d); }
+  if (t === 'parson' || t === '3')                     { const d = new Date(now); d.setDate(d.getDate() + 2); return startOfDay(d); }
 
-  // DD/MM/YYYY or DD-MM-YYYY
+  // DD/MM/YYYY or DD-MM-YYYY or DD/MM
   const m = t.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
   if (m) {
     const year = m[3] ? parseInt(m[3]) : now.getFullYear();
     const d    = new Date(year < 100 ? 2000 + year : year, parseInt(m[2]) - 1, parseInt(m[1]));
-    if (!isNaN(d)) return d;
+    if (!isNaN(d.getTime())) return startOfDay(d);
   }
   return null;
 };
 
-const fmtDate = (d) => d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+const fmtDate = (d) => {
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+};
 
-// ── Step handlers ─────────────────────────────────────────────────────────────
+// Cart helpers
+const cartTotal  = (cart) => (cart || []).reduce((s, i) => s + (i.price || 0), 0);
+const cartLines  = (cart) => (cart || []).map((i, idx) =>
+  `  ${idx + 1}. ${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''} — ₹${i.price}`
+).join('\n');
 
-const askService = async (to, biz, token) => {
-  const rows = biz.services.map((s) => ({
-    id: s.id, title: `${s.emoji} ${s.id}`, description: s.desc || '',
-  }));
+// Group time slots into Morning / Afternoon / Evening
+const groupSlots = (slots) => {
+  const g = { morning: [], afternoon: [], evening: [] };
+  for (const s of (slots || []).filter((s) => s.available)) {
+    const parts = s.slot.split(' ');           // ["10:00", "AM", "-", "12:00", "PM"]
+    const hour  = parseInt(parts[0].split(':')[0]);
+    const isPM  = parts[1] === 'PM';
+    const h24   = isPM && hour !== 12 ? hour + 12 : (!isPM && hour === 12 ? 0 : hour);
+    if (h24 < 12)      g.morning.push(s.slot);
+    else if (h24 < 17) g.afternoon.push(s.slot);
+    else               g.evening.push(s.slot);
+  }
+  return g;
+};
+
+// ── Welcome & main menu ───────────────────────────────────────────────────────
+
+const sendWelcome = async (to, biz, phoneNumberId, token, isReturning = false) => {
+  const greeting = isReturning
+    ? `Wapas aaye! Hamare parivaar mein aapka swagat hai 🙏`
+    : `Namaste! *${biz.name}* mein aapka swagat hai 🙏`;
+
+  await sendText(to,
+    `${greeting}\n\n` +
+    `✨ *Premium Home Cleaning — ${biz.tagline || biz.name}*\n\n` +
+    `*Hum kyun best choice hain?*\n` +
+    `✅ Verified & Trained Professionals\n` +
+    `🌿 100% Eco-Friendly — Safe for Kids & Pets\n` +
+    `💳 Pay ONLY After Service Completed\n` +
+    `💯 100% Satisfaction Guarantee\n` +
+    `⭐ 4.9 Rating — 10,000+ Happy Customers`,
+    phoneNumberId, token
+  );
+
   await sendList(to,
-    `✨ *${biz.name}* — Expert Cleaning at Your Doorstep! 🙏\n\n` +
-    `🌿 Eco-Friendly | Safe for Family & Pets\n` +
-    `💰 Transparent Pricing — No Hidden Charges\n` +
-    `⭐ 4.9 Rated | 100% Satisfaction Guaranteed\n\n` +
-    `Neeche se apni service select karein 👇`,
-    'Services Dekho',
-    [{ title: '🧹 Hamaari Services', rows }],
-    process.env[`${biz.id.toUpperCase()}_PHONE_NUMBER_ID`],
-    token
+    `Aaj hum aapki kya help kar sakte hain? 👇`,
+    `Menu Kholein`,
+    [
+      {
+        title: '🏠 Cleaning Services',
+        rows: [
+          { id: 'MENU_BOOK',   title: '🧹 Book Cleaning',  description: 'Service schedule karein' },
+          { id: 'MENU_PRICE',  title: '💰 Price List',      description: 'Sabhi services ke rates' },
+          { id: 'MENU_OFFERS', title: '🎁 Today\'s Offers', description: 'Special discounts aaj' },
+        ],
+      },
+      {
+        title: '📋 More Info',
+        rows: [
+          { id: 'MENU_REVIEWS', title: '⭐ Customer Reviews',  description: 'Happy customers ki baat' },
+          { id: 'MENU_AREAS',   title: '📍 Areas We Serve',   description: 'Coverage check karo' },
+          { id: 'MENU_FAQ',     title: '❓ FAQ',               description: 'Common sawalon ke jawab' },
+        ],
+      },
+      {
+        title: '🤝 Help & Support',
+        rows: [
+          { id: 'MENU_EXPERT',   title: '💬 Talk to Expert',    description: 'Team se seedha baat karo' },
+          { id: 'MENU_EXISTING', title: '📦 Existing Booking',  description: 'Track ya manage karein' },
+        ],
+      },
+    ],
+    phoneNumberId, token
   );
 };
 
+// ── Service selection ─────────────────────────────────────────────────────────
+
+const askService = async (to, biz, phoneNumberId, token) => {
+  const rows = biz.services.map((s) => ({
+    id:          s.id,
+    title:       `${s.emoji || ''} ${s.id}`.trim().substring(0, 24),
+    description: s.desc || '',
+  }));
+  await sendList(to,
+    `🧹 *Kaunsi service chahiye?*\n\n` +
+    `🌿 Eco-friendly | 💳 Pay after service | ⭐ 4.9 rated\n` +
+    `_Neeche se apni service chunein 👇_`,
+    `Service Chunein`,
+    [{ title: '✨ Available Services', rows }],
+    phoneNumberId, token
+  );
+};
+
+// Sub-service selection — supports multi-section layout (grouped by section field)
 const askSubService = async (to, biz, service, phoneNumberId, token) => {
   const subs = biz.subServices[service] || [];
-  const rows = subs.map((s) => ({
-    id:          s.id,
-    title:       s.id.substring(0, 24),
-    description: `₹${s.price}`,
-  }));
+
+  // Group by section
+  const sectionMap = {};
+  for (const s of subs) {
+    const sect = s.section || service;
+    if (!sectionMap[sect]) sectionMap[sect] = [];
+    sectionMap[sect].push({
+      id:          s.id,
+      title:       s.id.substring(0, 24),
+      description: s.desc || (s.price > 0 ? `₹${s.price}` : 'Custom price'),
+    });
+  }
+  const sections = Object.entries(sectionMap).map(([title, rows]) => ({ title, rows }));
+
+  const trustLine = {
+    'Home Cleaning':      '🛋️ Steam cleaning | Dries in 2-4 hrs | Odour-free',
+    'Deep Cleaning':      '🏠 Trained professionals | Eco-friendly | Spotless guarantee',
+    'Appliance Cleaning': '🔧 Genuine techniques | Better performance assured',
+    'Pest Control':       '🐜 Safe chemicals | Long-lasting protection',
+  }[service] || '✨ Professional service guaranteed';
+
   await sendList(to,
-    `🧹 *${service}*\n\nApna option choose karein 👇`,
-    'Option Chunein',
-    [{ title: service, rows }],
-    phoneNumberId,
-    token
+    `*${service}*\n\nApna item choose karein 👇\n_${trustLine}_`,
+    `Item Chunein`,
+    sections,
+    phoneNumberId, token
   );
 };
+
+// Quantity selector buttons (1, 2, 3, 4+)
+const sendQuantitySelector = async (to, subService, unitPrice, phoneNumberId, token) => {
+  await sendButtons(to,
+    `✅ *${subService.substring(0, 40)}* selected!\n\n💰 Unit price: ₹${unitPrice}/piece\n\nKitne chahiye? 👇`,
+    [
+      { id: 'QTY_1', title: '1️⃣  1 Piece' },
+      { id: 'QTY_2', title: '2️⃣  2 Pieces' },
+      { id: 'QTY_3', title: '3️⃣  3 Pieces' },
+    ],
+    phoneNumberId, token
+  );
+};
+
+// Shopping cart display with upsell and add-more/continue options
+const showCart = async (to, cart, service, phoneNumberId, token, showUpsell = false) => {
+  const total  = cartTotal(cart);
+  const lines  = cartLines(cart);
+  const upsell = showUpsell && UPSELL[service]
+    ? `\n\n💡 *${UPSELL[service].emoji} Tip for you!*\n${UPSELL[service].text}`
+    : '';
+
+  await sendButtons(to,
+    `🛒 *Aapka Cart:*\n${lines}\n━━━━━━━━━━━━━━━\n` +
+    `💰 *Total: ₹${total}*${upsell}\n\n` +
+    `Aur add karein ya booking continue karein? 👇`,
+    [
+      { id: 'ADD_MORE', title: '➕ Aur Add Karo' },
+      { id: 'CONTINUE', title: '✅ Continue Booking' },
+    ],
+    phoneNumberId, token
+  );
+};
+
+// ── Date & time selection ─────────────────────────────────────────────────────
 
 const askDate = async (to, phoneNumberId, token) => {
   await sendButtons(to,
     `📅 *Kab chahiye service?*\n\n` +
-    `Neeche se select karein 👇\n` +
-    `_(Koi aur date? Type karein: DD/MM/YYYY — jaise 28/06/2025)_`,
+    `_Hum 7 days a week available hain!_\n` +
+    `_(Koi aur date? Type karein: DD/MM/YYYY — jaise 25/07/2025)_`,
     [
       { id: 'aaj',    title: '⚡ Aaj (Today)' },
       { id: 'kal',    title: '🌅 Kal (Tomorrow)' },
@@ -205,89 +387,86 @@ const askDate = async (to, phoneNumberId, token) => {
   );
 };
 
-const askTime = async (to, date, phoneNumberId, token) => {
-  const slots = await getAvailableSlots(date);
-  const avail = slots.filter((s) => s.available);
+// Time group selection (Morning / Afternoon / Evening)
+const sendTimeGroups = async (to, date, slots, phoneNumberId, token) => {
+  const groups  = groupSlots(slots);
+  const rows    = [];
+  if (groups.morning.length)   rows.push({ id: 'TG_MORNING',   title: '🌅 Morning (6–12 PM)',  description: `${groups.morning.length} slots available` });
+  if (groups.afternoon.length) rows.push({ id: 'TG_AFTERNOON', title: '☀️ Afternoon (12–5PM)', description: `${groups.afternoon.length} slots available` });
+  if (groups.evening.length)   rows.push({ id: 'TG_EVENING',   title: '🌆 Evening (5–9 PM)',   description: `${groups.evening.length} slots available` });
 
-  if (!avail.length) {
-    await sendButtons(to,
-      `😔 *${fmtDate(date)}* ke liye koi slot available nahi hai.\n\nKoi aur date try karein 👇`,
-      [{ id: 'kal', title: '🌅 Kal' }, { id: 'parson', title: '📆 Parson' }, { id: 'other_date', title: '📆 Aur date' }],
-      phoneNumberId, token
-    );
-    return false;
-  }
-
-  const rows = avail.map((s) => ({ id: s.slot, title: s.slot }));
+  if (!rows.length) return false;
 
   await sendList(to,
-    `🕐 *${fmtDate(date)}* ke liye available time slots:\n\nApna preferred time choose karein 👇`,
-    'Time Slot Chunein',
+    `🕐 *${fmtDate(date)}*\n\nKaunse time mein aata hai aapko? 👇`,
+    `Time Group Chunein`,
+    [{ title: '⏰ Time of Day', rows }],
+    phoneNumberId, token
+  );
+  return true;
+};
+
+// Specific slot selection within a time group
+const askSpecificTime = async (to, date, slots, group, phoneNumberId, token) => {
+  const groups  = groupSlots(slots);
+  const grouped = groups[group] || [];
+  if (!grouped.length) return false;
+
+  const rows = grouped.map((s) => ({ id: s, title: s }));
+  await sendList(to,
+    `✅ Great choice!\n\n*${fmtDate(date)}* ke liye exact time chunein 👇`,
+    `Slot Chunein`,
     [{ title: '⏰ Available Slots', rows }],
     phoneNumberId, token
   );
   return true;
 };
 
+// ── Address, name, confirmation ───────────────────────────────────────────────
+
 const askAddress = async (to, phoneNumberId, token) => {
-  await sendText(to,
+  await sendButtons(to,
     `📍 *Aapka address kya hai?*\n\n` +
-    `Poora address likhein:\n` +
-    `Flat/Ghar no. → Gali/Society → Area → City\n\n` +
-    `_(Ya location pin share karein 📌)_`,
+    `Pura address type karein:\n` +
+    `_Flat/House → Society/Gali → Area → City_\n\n` +
+    `_(Ya location pin share karo 📌 — WhatsApp mein: Attach → Location)_`,
+    [{ id: 'SHARE_LOCATION', title: '📌 Share Location' }],
     phoneNumberId, token
   );
 };
 
 const askName = async (to, phoneNumberId, token) => {
   await sendText(to,
-    `👤 *Aakhri step! Aapka naam kya hai?*\n\n_(Jaise: Rahul Sharma)_`,
+    `👤 *Almost done! Aapka naam batayein* 😊\n\n` +
+    `_(Jaise: Rahul Sharma — taaki professional aapko address kar sake)_`,
     phoneNumberId, token
   );
 };
 
-const askCustomRequest = async (to, phoneNumberId, token) => {
-  await sendText(to,
-    `💬 *Aapko kya chahiye?*\n\n` +
-    `Apni requirement detail mein type karein 📝\n\n` +
-    `_Jaise: "Curtain cleaning", "3 BHK full clean", "AC servicing × 2" etc._`,
-    phoneNumberId, token
-  );
-};
-
-const askAddMore = async (to, selectedServices, phoneNumberId, token) => {
-  const lines = selectedServices.map((s) => `  • ${s.subService}${s.price > 0 ? ` — ₹${s.price}` : ''}`).join('\n');
-  const total = selectedServices.reduce((sum, s) => sum + (s.price || 0), 0);
-  await sendButtons(to,
-    `✅ *Added!*\n\n` +
-    `📋 *Selected so far:*\n${lines}\n` +
-    (total > 0 ? `\n💰 *Total:* ₹${total}\n` : '') +
-    `\nKoi aur service add karni hai?`,
-    [
-      { id: 'ADD_MORE', title: '➕ Aur Add Karo' },
-      { id: 'CONTINUE', title: '✅ Booking Continue' },
-    ],
-    phoneNumberId, token
-  );
-};
-
+// Full booking summary + review + trust line + confirm/cancel
 const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
-  const services = data.selectedServices || [{ subService: data.subService, price: data.quotedAmount || 0 }];
-  const serviceLines = services.map((s) => `  • ${s.subService}${s.price > 0 ? ` — ₹${s.price}` : ''}`).join('\n');
-  const total = services.reduce((sum, s) => sum + (s.price || 0), 0);
-  const summary =
-    `🧾 *Booking Details — ${bizName}*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🧹 *Services:*\n${serviceLines}\n` +
+  const services = data.selectedServices || [];
+  const total    = cartTotal(services);
+  const lines    = services.map((i) =>
+    `  🧹 ${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''} — ₹${i.price}`
+  ).join('\n');
+
+  // Rotate through reviews based on time
+  const review = REVIEWS[Math.floor(Date.now() / 60000) % REVIEWS.length];
+
+  await sendButtons(to,
+    `📋 *Booking Summary — ${bizName}*\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 *Name:* ${data.name}\n` +
+    `🧹 *Services:*\n${lines}\n` +
     `📅 *Date:* ${fmtDate(data.date)}\n` +
     `🕐 *Time:* ${data.timeSlot}\n` +
     `📍 *Address:* ${data.address}\n` +
-    `👤 *Name:* ${data.name}\n` +
-    (total > 0 ? `💰 *Total Estimated:* ₹${total}\n` : '') +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `Sab sahi hai? Confirm karein 👇`;
-
-  await sendButtons(to, summary,
+    `💰 *Total:* ₹${total}\n` +
+    `💳 *Payment:* After Service Only\n` +
+    `━━━━━━━━━━━━━━━━━━━\n\n` +
+    `${review.star} *Customer Review:*\n${review.text}\n— _${review.name}_\n\n` +
+    `Sab sahi hai? Confirm karein 👇`,
     [
       { id: 'CONFIRM_YES', title: '✅ Confirm Booking' },
       { id: 'CONFIRM_NO',  title: '❌ Cancel' },
@@ -296,27 +475,79 @@ const sendConfirm = async (to, data, bizName, phoneNumberId, token) => {
   );
 };
 
+// Booking confirmed — send reference + next steps
 const sendBookingDone = async (to, name, bizName, phoneNumberId, token, data = {}) => {
-  const services = Array.isArray(data.selectedServices) ? data.selectedServices : [];
-  let summary = '';
-  if (services.length > 0) {
-    const lines = services
-      .map((s) => `🧹 ${s.subService}${s.price > 0 ? ` — ₹${s.price}` : ''}`)
-      .join('\n');
-    const total = services.reduce((sum, s) => sum + (s.price || 0), 0);
-    summary =
-      `📋 *Booking Summary:*\n${lines}\n` +
-      `📅 ${fmtDate(data.date)}\n` +
-      `🕐 ${data.timeSlot}\n` +
-      (total > 0 ? `💰 Total: ₹${total}\n` : '') +
-      `📍 ${data.address}\n\n`;
-  }
+  const services  = Array.isArray(data.selectedServices) ? data.selectedServices : [];
+  const total     = cartTotal(services);
+  const lines     = services.map((i) =>
+    `  🧹 ${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''} — ₹${i.price}`
+  ).join('\n');
+  const bookingRef = `SS${Date.now().toString().slice(-6)}`;
+
   await sendText(to,
-    `🎉 *Shukriya, ${name}! Booking mili!*\n\n` +
-    summary +
-    `Hamaari team *1 ghante mein* aapko confirm karegi. \n\n` +
-    `Koi sawaal? Yahan message karein — hum hain! 🙏\n\n` +
-    `_${bizName} — Expert Cleaning at Your Doorstep_ ✨`,
+    `🎉 *Booking Confirmed! Shukriya ${name}!* 🙏\n\n` +
+    `📌 *Booking Ref: #${bookingRef}*\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    (lines ? `${lines}\n` : '') +
+    `📅 ${fmtDate(data.date)} · 🕐 ${data.timeSlot}\n` +
+    (total > 0 ? `💰 Total: ₹${total} _(pay after service)_\n` : '') +
+    `━━━━━━━━━━━━━━━\n\n` +
+    `*⏭️ Aage kya hoga:*\n` +
+    `1️⃣ 1 ghante mein confirmation call\n` +
+    `2️⃣ Professional assigned — notification aayegi\n` +
+    `3️⃣ Team scheduled time pe aayegi\n` +
+    `4️⃣ Service complete → Tab pay karein\n\n` +
+    `💬 Koi sawaal? Yahan reply karein — hum hain! 🙏\n` +
+    `_${bizName} — Always at Your Service_ ✨`,
+    phoneNumberId, token
+  );
+};
+
+// ── Static page senders ───────────────────────────────────────────────────────
+
+const sendPriceList = async (to, biz, phoneNumberId, token) => {
+  let msg = `💰 *${biz.name} — Complete Price List*\n━━━━━━━━━━━━━━━\n\n`;
+  for (const [svc, items] of Object.entries(biz.subServices || {})) {
+    msg += `*${svc}:*\n`;
+    for (const item of items.slice(0, 5)) {
+      msg += `  • ${item.id}: ${item.price > 0 ? `₹${item.price}` : 'Custom quote'}\n`;
+    }
+    if (items.length > 5) msg += `  _(+ ${items.length - 5} more)_\n`;
+    msg += '\n';
+  }
+  msg += `💳 *Pay After Service — Always!*\n📞 Custom quote ke liye message karein.`;
+  await sendText(to, msg, phoneNumberId, token);
+  await sendReturnToMenu(to, phoneNumberId, token);
+};
+
+const sendFAQ = async (to, phoneNumberId, token) => {
+  const rows = Object.keys(FAQ).map((key) => ({
+    id:          `FAQ_${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`,
+    title:       key.substring(0, 24),
+    description: 'Tap to read answer',
+  }));
+  await sendList(to,
+    `❓ *Frequently Asked Questions*\n\nKaunsa sawaal hai aapka? 👇`,
+    `Topic Chunein`,
+    [{ title: '📋 Topics', rows }],
+    phoneNumberId, token
+  );
+};
+
+const sendReviews = async (to, phoneNumberId, token) => {
+  const msg = `⭐ *Happy Customer Stories!*\n━━━━━━━━━━━━━━━\n\n` +
+    REVIEWS.map((r) => `${r.star}\n${r.text}\n— _${r.name}_`).join('\n\n');
+  await sendText(to, msg, phoneNumberId, token);
+  await sendReturnToMenu(to, phoneNumberId, token);
+};
+
+const sendReturnToMenu = async (to, phoneNumberId, token) => {
+  await sendButtons(to,
+    `Aur kuch help chahiye? 😊`,
+    [
+      { id: 'MENU_BOOK', title: '🧹 Book Cleaning' },
+      { id: 'MENU_MAIN', title: '🏠 Main Menu' },
+    ],
     phoneNumberId, token
   );
 };
@@ -324,7 +555,6 @@ const sendBookingDone = async (to, name, bizName, phoneNumberId, token, data = {
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
-  // Identify business from incoming phone number ID (passed as businessPhone = metadata.phone_number_id)
   const biz = getBusiness(businessPhone);
   if (!biz) {
     console.warn(`[BOT] Unknown phoneNumberId: ${businessPhone}`);
@@ -337,164 +567,450 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
   const phoneNumberId = businessPhone;
 
   if (!token) {
-    console.warn(`[BOT] No token configured for ${biz.name}`);
+    console.warn(`[BOT] No token for ${biz.name}`);
     return;
   }
 
   const conv = await getOrCreate(from, biz.id);
 
-  // "restart" keyword resets conversation
-  if (text.toLowerCase() === 'restart' || text.toLowerCase() === 'hi' || text.toLowerCase() === 'hello' || text.toLowerCase() === 'namaste') {
+  // ── Global triggers — work from any state ──────────────────────────────────
+
+  const lowerText = (text || '').trim().toLowerCase();
+
+  // Greeting → fresh start (with returning customer check)
+  if (['hi', 'hello', 'hey', 'namaste', 'hii', 'helo', 'helo', 'start', 'restart'].includes(lowerText)) {
     await Conversation.deleteOne({ _id: conv._id });
-    const fresh = await getOrCreate(from, biz.id);
-    await askService(from, biz, token);
-    await save(fresh, 'AWAITING_SERVICE');
+    const fresh           = await getOrCreate(from, biz.id);
+    const existingLead    = await Lead.findOne({ phone: from, source: 'whatsapp', stage: { $ne: 'new' } }).sort({ createdAt: -1 });
+    await sendWelcome(from, biz, phoneNumberId, token, !!existingLead);
+    await save(fresh, 'AWAITING_MAIN_MENU');
     return;
   }
 
+  // "menu" keyword or MENU_MAIN button — go back to main menu
+  if (lowerText === 'menu' || text === 'MENU_MAIN') {
+    await sendWelcome(from, biz, phoneNumberId, token, true);
+    await save(conv, 'AWAITING_MAIN_MENU');
+    return;
+  }
+
+  // Book button from return-to-menu shortcut
+  if (text === 'MENU_BOOK' && conv.step !== 'AWAITING_MAIN_MENU') {
+    await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
+    await askService(from, biz, phoneNumberId, token);
+    return;
+  }
+
+  // Handle image messages — acknowledge without blocking
+  if (msgType === 'image') {
+    if (conv.step === 'AWAITING_SUBSERVICE') {
+      await sendText(from,
+        `📸 Photo mili! Hum check karke estimate karenge.\n\nTab tak, list se approximate size select karein.\n_Ya "menu" type karo main menu ke liye._ 😊`,
+        phoneNumberId, token
+      );
+    } else {
+      await sendText(from,
+        `📸 Photo mili! Hamare team ko forward kar raha hoon.\n\nKoi sawaal ho toh type karein, ya _"menu"_ type karo. 😊`,
+        phoneNumberId, token
+      );
+    }
+    return;
+  }
+
+  // ── State machine ─────────────────────────────────────────────────────────
+
   switch (conv.step) {
 
+    // ── Main Menu ─────────────────────────────────────────────────────────────
+    case 'AWAITING_MAIN_MENU': {
+      switch (text) {
+        case 'MENU_BOOK':
+          await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
+          await askService(from, biz, phoneNumberId, token);
+          break;
+        case 'MENU_PRICE':
+          await sendPriceList(from, biz, phoneNumberId, token);
+          break;
+        case 'MENU_OFFERS':
+          await sendText(from, OFFERS_TEXT, phoneNumberId, token);
+          await sendReturnToMenu(from, phoneNumberId, token);
+          break;
+        case 'MENU_REVIEWS':
+          await sendReviews(from, phoneNumberId, token);
+          break;
+        case 'MENU_AREAS':
+          await sendText(from, AREAS_TEXT, phoneNumberId, token);
+          await sendReturnToMenu(from, phoneNumberId, token);
+          break;
+        case 'MENU_FAQ':
+          await sendFAQ(from, phoneNumberId, token);
+          await save(conv, 'AWAITING_FAQ');
+          break;
+        case 'MENU_EXPERT':
+          await sendText(from,
+            `💬 *Hamare Expert Se Baat Karein*\n\n` +
+            `📞 Call: +91-XXXXXXXXXX\n` +
+            `⏰ Available: 9 AM – 9 PM, 7 days\n\n` +
+            `Ya yahan message karein — *15 minutes* mein response guaranteed! 🙏\n\n` +
+            `_Hamare team ka koi bhi sawaal miss nahi karta._ ✅`,
+            phoneNumberId, token
+          );
+          await sendReturnToMenu(from, phoneNumberId, token);
+          break;
+        case 'MENU_EXISTING':
+          await sendButtons(from,
+            `📦 *Existing Booking Manage Karein*\n\n` +
+            `_Booking Ref # ya registered phone number ready rakhein._`,
+            [
+              { id: 'EB_TRACK',      title: '🔍 Track Booking' },
+              { id: 'EB_RESCHEDULE', title: '📅 Reschedule' },
+              { id: 'EB_CANCEL',     title: '❌ Cancel Booking' },
+            ],
+            phoneNumberId, token
+          );
+          await save(conv, 'AWAITING_EXISTING_BOOKING');
+          break;
+        default:
+          // Unrecognised — re-show welcome menu
+          await sendWelcome(from, biz, phoneNumberId, token, true);
+      }
+      break;
+    }
+
+    // ── FAQ ───────────────────────────────────────────────────────────────────
+    case 'AWAITING_FAQ': {
+      // text is like 'FAQ_PRICING___PAYMENT', 'FAQ_HOW_LONG_IT_TAKES', etc.
+      const faqEntry = Object.entries(FAQ).find(([k]) =>
+        `FAQ_${k.toUpperCase().replace(/[^A-Z0-9]/g, '_')}` === text
+      );
+      if (faqEntry) {
+        await sendText(from, `*${faqEntry[0]}*\n\n${faqEntry[1]}`, phoneNumberId, token);
+        await sendReturnToMenu(from, phoneNumberId, token);
+        await save(conv, 'AWAITING_MAIN_MENU');
+      } else {
+        await sendFAQ(from, phoneNumberId, token);
+      }
+      break;
+    }
+
+    // ── Existing Booking ──────────────────────────────────────────────────────
+    case 'AWAITING_EXISTING_BOOKING': {
+      if (text === 'EB_TRACK') {
+        await sendText(from,
+          `🔍 *Booking Track Karein*\n\n` +
+          `Apna *Booking Ref #* type karein\n` +
+          `_(Jaise: #SS123456 — confirmation message mein diya tha)_\n\n` +
+          `Ya registered phone se 📞 call karein:\n` +
+          `+91-XXXXXXXXXX (9 AM - 9 PM)`,
+          phoneNumberId, token
+        );
+      } else if (text === 'EB_RESCHEDULE') {
+        await sendText(from,
+          `📅 *Reschedule Karein*\n\n` +
+          `Naya preferred date aur time send karein:\n` +
+          `_"Reschedule #SS123456 — 15 July, Afternoon"_\n\n` +
+          `Ya call karein: 📞 +91-XXXXXXXXXX\n` +
+          `_2 ghante pehle tak free reschedule!_ ✅`,
+          phoneNumberId, token
+        );
+      } else if (text === 'EB_CANCEL') {
+        await sendText(from,
+          `❌ *Cancel Karein*\n\n` +
+          `Type karein: _"Cancel #SS123456"_\n\n` +
+          `Ya call karein: 📞 +91-XXXXXXXXXX\n\n` +
+          `📋 *Cancellation Policy:*\n` +
+          `• 2+ ghante pehle → Free\n` +
+          `• 1-2 ghante → 50% charge\n` +
+          `• Last minute → Full charge`,
+          phoneNumberId, token
+        );
+      }
+      await sendReturnToMenu(from, phoneNumberId, token);
+      await save(conv, 'AWAITING_MAIN_MENU');
+      break;
+    }
+
+    // ── Service Selection ─────────────────────────────────────────────────────
     case 'AWAITING_SERVICE': {
       const match = biz.services.find(
-        (s) => s.id.toLowerCase() === text.toLowerCase() || text === s.id
+        (s) => s.id.toLowerCase() === text.toLowerCase() || s.id === text
       );
-      if (!match) {
-        await askService(from, biz, token);
-        break;
-      }
-      // Only create partial lead on first visit (preserve leadId when returning to add more services)
+      if (!match) { await askService(from, biz, phoneNumberId, token); break; }
+
       let leadId = conv.data.leadId;
       if (!leadId) {
-        const partialLead = await Lead.create({
+        const partial = await Lead.create({
           name: 'Incomplete', phone: from, serviceInterest: match.id,
           source: 'whatsapp', stage: 'new',
           notes: 'WhatsApp bot — conversation in progress',
         });
-        leadId = partialLead._id.toString();
+        leadId = partial._id.toString();
       }
-      // Custom request — skip sub-service list, ask them to describe
+
       if (match.id === 'Other / Custom') {
         await save(conv, 'AWAITING_CUSTOM_REQUEST', { service: match.id, leadId });
-        await askCustomRequest(from, phoneNumberId, token);
+        await sendText(from,
+          `💬 *Apni Requirement Batayein* 📝\n\n` +
+          `Detail mein likhein:\n` +
+          `_Jaise: "3 sofas + 2 carpets clean karwane hain" ya "full home deep clean"_\n\n` +
+          `Hum aapke liye best quote prepare karenge! ✨`,
+          phoneNumberId, token
+        );
         break;
       }
+
       await save(conv, 'AWAITING_SUBSERVICE', { service: match.id, leadId });
       await askSubService(from, biz, match.id, phoneNumberId, token);
       break;
     }
 
+    // ── Custom Request ────────────────────────────────────────────────────────
     case 'AWAITING_CUSTOM_REQUEST': {
       if (text.trim().length < 3) {
-        await sendText(from, '⚠️ Thoda detail mein batayein please 🙏', phoneNumberId, token);
+        await sendText(from, `⚠️ Thoda detail mein batayein please 🙏`, phoneNumberId, token);
         break;
       }
-      const customDesc = text.trim();
       if (conv.data.leadId) {
         await Lead.findByIdAndUpdate(conv.data.leadId, {
-          serviceInterest: customDesc,
-          notes: `Custom request: ${customDesc}`,
+          serviceInterest: text.trim(), notes: `Custom request: ${text.trim()}`,
         });
       }
       const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
-      const updated  = [...existing, { service: 'Other / Custom', subService: customDesc, price: 0 }];
-      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: updated });
-      await askAddMore(from, updated, phoneNumberId, token);
+      const cart     = [...existing, { service: 'Other / Custom', subService: text.trim(), price: 0, quantity: 1, unitPrice: 0 }];
+      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
+      await showCart(from, cart, 'Other / Custom', phoneNumberId, token, false);
       break;
     }
 
+    // ── Sub-service Selection ─────────────────────────────────────────────────
     case 'AWAITING_SUBSERVICE': {
       const subs  = biz.subServices[conv.data.service] || [];
       const match = subs.find((s) => s.id.toLowerCase() === text.toLowerCase() || s.id === text);
-      if (!match) {
-        await askSubService(from, biz, conv.data.service, phoneNumberId, token);
+      if (!match) { await askSubService(from, biz, conv.data.service, phoneNumberId, token); break; }
+
+      // 6+ seat sofa — ask for seat count
+      if (match.askCount) {
+        await save(conv, 'AWAITING_SEAT_COUNT', { pendingSubService: match.id, pendingUnitPrice: 90 });
+        await sendText(from,
+          `🛋️ *${match.id}*\n\n` +
+          `Apne sofa mein total kitne seats hain?\n` +
+          `_(Sirf number type karein — jaise: 7 ya 10)_\n\n` +
+          `💰 Rate: ₹90 per seat`,
+          phoneNumberId, token
+        );
         break;
       }
+
+      // Quantity-based item — ask how many
+      if (match.askQty) {
+        await save(conv, 'AWAITING_QUANTITY', { pendingSubService: match.id, pendingUnitPrice: match.price });
+        await sendQuantitySelector(from, match.id, match.price, phoneNumberId, token);
+        break;
+      }
+
+      // Direct add to cart (single item, no quantity)
       const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
-      const updated  = [...existing, { service: conv.data.service, subService: match.id, price: match.price }];
-      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: updated });
-      await askAddMore(from, updated, phoneNumberId, token);
+      const isFirst  = existing.length === 0;
+      const cart     = [...existing, { service: conv.data.service, subService: match.id, price: match.price, quantity: 1, unitPrice: match.price }];
+      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
+      await showCart(from, cart, conv.data.service, phoneNumberId, token, isFirst);
       break;
     }
 
+    // ── Seat Count Input (for 6+ sofa) ────────────────────────────────────────
+    case 'AWAITING_SEAT_COUNT': {
+      const seats = parseInt(text.trim());
+      if (isNaN(seats) || seats < 1 || seats > 50) {
+        await sendText(from, `⚠️ Seats ki number type karein (jaise: 7 ya 10) 🙏`, phoneNumberId, token);
+        break;
+      }
+      const unitPrice = conv.data.pendingUnitPrice || 90;
+      const price     = seats * unitPrice;
+      const existing  = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+      const isFirst   = existing.length === 0;
+      const cart      = [...existing, {
+        service:   conv.data.service,
+        subService: `Sofa — ${seats} Seats`,
+        price,
+        quantity:  1,
+        unitPrice,
+      }];
+      await sendText(from, `✅ *Sofa — ${seats} seats* added!\n_(${seats} × ₹${unitPrice} = ₹${price})_`, phoneNumberId, token);
+      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
+      await showCart(from, cart, conv.data.service, phoneNumberId, token, isFirst);
+      break;
+    }
+
+    // ── Quantity Input ────────────────────────────────────────────────────────
+    case 'AWAITING_QUANTITY': {
+      let qty = 0;
+      if (text === 'QTY_1')      qty = 1;
+      else if (text === 'QTY_2') qty = 2;
+      else if (text === 'QTY_3') qty = 3;
+      else                       qty = parseInt(text.trim());
+
+      if (isNaN(qty) || qty < 1 || qty > 20) {
+        await sendQuantitySelector(from, conv.data.pendingSubService, conv.data.pendingUnitPrice, phoneNumberId, token);
+        break;
+      }
+
+      const unitPrice = conv.data.pendingUnitPrice;
+      const price     = unitPrice * qty;
+      const existing  = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+      const isFirst   = existing.length === 0;
+      const cart      = [...existing, {
+        service:    conv.data.service,
+        subService: conv.data.pendingSubService,
+        price,
+        quantity:   qty,
+        unitPrice,
+      }];
+      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
+      await showCart(from, cart, conv.data.service, phoneNumberId, token, isFirst);
+      break;
+    }
+
+    // ── Add More / Continue ───────────────────────────────────────────────────
     case 'AWAITING_ADD_MORE': {
       if (text === 'ADD_MORE') {
         await save(conv, 'AWAITING_SERVICE');
-        await askService(from, biz, token);
+        await askService(from, biz, phoneNumberId, token);
         break;
       }
       if (text === 'CONTINUE') {
-        const services = conv.data.selectedServices || [];
-        const total    = services.reduce((sum, s) => sum + (s.price || 0), 0);
-        await save(conv, 'AWAITING_DATE', { quotedAmount: total });
+        const total = cartTotal(conv.data.selectedServices);
+        await Lead.findByIdAndUpdate(conv.data.leadId, { quotedAmount: total }).catch(() => {});
+        await save(conv, 'AWAITING_DATE');
         await askDate(from, phoneNumberId, token);
         break;
       }
-      // Unrecognised input — re-show buttons
-      await askAddMore(from, conv.data.selectedServices || [], phoneNumberId, token);
+      // Unrecognised — re-show cart
+      await showCart(from, conv.data.selectedServices || [], conv.data.service, phoneNumberId, token, false);
       break;
     }
 
+    // ── Date Selection ────────────────────────────────────────────────────────
     case 'AWAITING_DATE': {
       const date = parseDate(text);
       if (!date) {
-        await sendText(from, '⚠️ Date samajh nahi aaya. Kripya DD/MM/YYYY format mein likhein, jaise: *25/06/2025*', phoneNumberId, token);
+        await sendText(from, `⚠️ Date samajh nahi aaya. Kripya *DD/MM/YYYY* format mein likhein — jaise: *25/07/2025*`, phoneNumberId, token);
         break;
       }
-      await save(conv, 'AWAITING_TIME', { date });
-      const ok = await askTime(from, date, phoneNumberId, token);
-      if (!ok) await save(conv, 'AWAITING_DATE');
+      const slots = await getAvailableSlots(date);
+      await save(conv, 'AWAITING_TIME_GROUP', {
+        date,
+        allSlots: slots.map((s) => ({ slot: s.slot, available: s.available })),
+      });
+      const ok = await sendTimeGroups(from, date, slots, phoneNumberId, token);
+      if (!ok) {
+        await sendText(from, `😔 *${fmtDate(date)}* ke liye koi slot available nahi hai. Koi aur date try karein!`, phoneNumberId, token);
+        await save(conv, 'AWAITING_DATE');
+        await askDate(from, phoneNumberId, token);
+      }
       break;
     }
 
-    case 'AWAITING_TIME': {
-      // text should be a valid slot string like "10:00 AM - 12:00 PM"
-      const slots = await getAvailableSlots(conv.data.date);
-      const match = slots.find((s) => s.slot === text && s.available);
-      if (!match) {
-        await sendText(from, '⚠️ Yeh slot available nahi hai. Neeche se ek aur select karein:', phoneNumberId, token);
-        await askTime(from, conv.data.date, phoneNumberId, token);
+    // ── Time Group Selection ──────────────────────────────────────────────────
+    case 'AWAITING_TIME_GROUP': {
+      const groupMap = { TG_MORNING: 'morning', TG_AFTERNOON: 'afternoon', TG_EVENING: 'evening' };
+      const group    = groupMap[text];
+
+      if (!group) {
+        const slots = conv.data.allSlots || [];
+        await sendTimeGroups(from, new Date(conv.data.date), slots, phoneNumberId, token);
         break;
       }
+
+      await save(conv, 'AWAITING_TIME', { timeGroup: group });
+      const ok = await askSpecificTime(
+        from, new Date(conv.data.date), conv.data.allSlots || [], group, phoneNumberId, token
+      );
+      if (!ok) {
+        await sendText(from, `😔 Is time mein slots nahi hain. Koi aur time group chunein.`, phoneNumberId, token);
+        await sendTimeGroups(from, new Date(conv.data.date), conv.data.allSlots || [], phoneNumberId, token);
+        await save(conv, 'AWAITING_TIME_GROUP');
+      }
+      break;
+    }
+
+    // ── Specific Time Slot ────────────────────────────────────────────────────
+    case 'AWAITING_TIME': {
+      const allSlots = conv.data.allSlots || [];
+      const match    = allSlots.find((s) => s.slot === text && s.available);
+
+      if (!match) {
+        // Re-show the group slots
+        const group = conv.data.timeGroup || 'morning';
+        await sendText(from, `⚠️ Yeh slot available nahi. Dobara choose karein:`, phoneNumberId, token);
+        await askSpecificTime(from, new Date(conv.data.date), allSlots, group, phoneNumberId, token);
+        break;
+      }
+
       await save(conv, 'AWAITING_ADDRESS', { timeSlot: text });
       await askAddress(from, phoneNumberId, token);
       break;
     }
 
+    // ── Address ───────────────────────────────────────────────────────────────
     case 'AWAITING_ADDRESS': {
-      let address = text;
-      // If customer shared location pin
-      if (text.startsWith('__LOCATION__:')) {
-        const coords = text.replace('__LOCATION__:', '');
-        address = `GPS: https://maps.google.com/?q=${coords}`;
-      }
-      if (address.trim().length < 5) {
-        await sendText(from, '⚠️ Address thoda aur detail mein likhein please.', phoneNumberId, token);
+      if (text === 'SHARE_LOCATION') {
+        await sendText(from,
+          `📌 *Location Share Karne Ka Tarika:*\n\n` +
+          `WhatsApp mein:\n` +
+          `📎 Attach → Location → Current Location Send Karein\n\n` +
+          `_Ya manually type karein — Flat no., Society, Area, City_ 🏠`,
+          phoneNumberId, token
+        );
         break;
       }
+
+      let address = text;
+      if (text.startsWith('__LOCATION__:')) {
+        const coords = text.replace('__LOCATION__:', '');
+        address = `📍 GPS Location: https://maps.google.com/?q=${coords}`;
+      }
+
+      if (address.trim().length < 5) {
+        await sendText(from, `⚠️ Thoda aur detail mein address likhein please. 🙏`, phoneNumberId, token);
+        break;
+      }
+
+      await sendText(from,
+        `✅ *Bahut Accha!*\n\n` +
+        `📍 Hum aapke area mein service karte hain!\n` +
+        `_Sab ready hai. Bas ek last step..._`,
+        phoneNumberId, token
+      );
       await save(conv, 'AWAITING_NAME', { address });
       await askName(from, phoneNumberId, token);
       break;
     }
 
+    // ── Name ──────────────────────────────────────────────────────────────────
     case 'AWAITING_NAME': {
       if (text.trim().length < 2) {
-        await sendText(from, '⚠️ Naam likhein please.', phoneNumberId, token);
+        await sendText(from, `⚠️ Apna naam likhein please 😊`, phoneNumberId, token);
         break;
       }
-      await save(conv, 'AWAITING_CONFIRM', { name: text.trim() });
-      await sendConfirm(from, { ...conv.data, name: text.trim() }, biz.name, phoneNumberId, token);
+      const name = text.trim();
+      await save(conv, 'AWAITING_CONFIRM', { name });
+      await sendConfirm(from, { ...conv.data, name }, biz.name, phoneNumberId, token);
       break;
     }
 
+    // ── Confirm Booking ───────────────────────────────────────────────────────
     case 'AWAITING_CONFIRM': {
-      if (text === 'CONFIRM_YES' || text.toLowerCase() === 'confirm' || text === '1') {
-        const services       = conv.data.selectedServices || [{ subService: conv.data.subService, price: conv.data.quotedAmount || 0 }];
+      if (text === 'CONFIRM_YES' || lowerText === 'confirm' || text === '1') {
+        const services       = conv.data.selectedServices || [];
         const serviceInterest = services.map((s) => s.subService).join(' + ');
-        const totalAmount    = services.reduce((sum, s) => sum + (s.price || 0), 0);
-        const serviceNotes   = services.map((s) => `${s.subService}${s.price > 0 ? ` (₹${s.price})` : ''}`).join('\n');
+        const totalAmount    = cartTotal(services);
+        const serviceNotes   = services.map((s) =>
+          `${s.subService}${s.quantity > 1 ? ` ×${s.quantity}` : ''} (₹${s.price})`
+        ).join('\n');
+
         const leadData = {
           name:            conv.data.name,
-          serviceInterest: serviceInterest,
+          serviceInterest,
           quotedAmount:    totalAmount,
           scheduledDate:   conv.data.date,
           timeSlot:        conv.data.timeSlot,
@@ -502,6 +1018,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           notes:           `Services:\n${serviceNotes}`,
           stage:           'new',
         };
+
         if (conv.data.leadId) {
           await Lead.findByIdAndUpdate(conv.data.leadId, leadData);
         } else {
@@ -510,32 +1027,43 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
         await save(conv, 'COMPLETED');
         await sendBookingDone(from, conv.data.name, biz.name, phoneNumberId, token, conv.data);
-        console.log(`[BOT] ✅ Lead confirmed — ${conv.data.name} (${from}) — ${biz.name}`);
+        console.log(`[BOT] ✅ Booking confirmed — ${conv.data.name} (${from}) — ${biz.name} — ₹${totalAmount}`);
 
-      } else if (text === 'CONFIRM_NO' || text.toLowerCase() === 'cancel' || text === '2') {
+      } else if (text === 'CONFIRM_NO' || lowerText === 'cancel' || text === '2') {
         if (conv.data.leadId) {
-          await Lead.findByIdAndUpdate(conv.data.leadId, { stage: 'lost', notes: 'Customer cancelled during WhatsApp booking' });
+          await Lead.findByIdAndUpdate(conv.data.leadId, {
+            stage: 'lost', notes: 'Customer cancelled during WhatsApp booking confirmation',
+          });
         }
         await Conversation.deleteOne({ _id: conv._id });
-        await sendText(from, '❌ Booking cancel kar di gayi. Dobara book karne ke liye "Hi" likhein.', phoneNumberId, token);
+        await sendText(from,
+          `❌ Booking cancel ho gayi.\n\nKabhi bhi nayi booking ke liye *"Hi"* type karein.\nHum hamesha available hain! 🙏`,
+          phoneNumberId, token
+        );
 
       } else {
+        // Re-show confirmation if customer types something unexpected
         await sendConfirm(from, conv.data, biz.name, phoneNumberId, token);
       }
       break;
     }
 
+    // ── Completed ─────────────────────────────────────────────────────────────
     case 'COMPLETED': {
       await sendText(from,
-        `Aapki booking already confirmed hai! 🎉\n\nNayi booking ke liye *"Hi"* likhein.`,
+        `Aapki booking already confirm hai! 🎉\n\n` +
+        `Nayi booking ke liye *"Hi"* type karein.\n` +
+        `Kisi bhi sawaal ke liye yahan message karein. 🙏`,
         phoneNumberId, token
       );
       break;
     }
 
-    default:
-      await askService(from, biz, token);
-      await save(conv, 'AWAITING_SERVICE');
+    // ── Default / Unknown state ───────────────────────────────────────────────
+    default: {
+      await sendWelcome(from, biz, phoneNumberId, token, true);
+      await save(conv, 'AWAITING_MAIN_MENU');
+    }
   }
 };
 

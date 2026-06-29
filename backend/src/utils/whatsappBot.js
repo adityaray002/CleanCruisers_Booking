@@ -275,13 +275,6 @@ const sendWelcome = async (to, biz, phoneNumberId, token, isReturning = false) =
         ],
       },
       {
-        title: '📋 More Info',
-        rows: [
-          { id: 'MENU_REVIEWS', title: '⭐ Customer Reviews',  description: 'Happy customers ki baat' },
-          { id: 'MENU_FAQ',     title: '❓ FAQ',               description: 'Common sawalon ke jawab' },
-        ],
-      },
-      {
         title: '🤝 Help & Support',
         rows: [
           { id: 'MENU_EXPERT',   title: '💬 Talk to Expert',    description: 'Team se seedha baat karo' },
@@ -935,7 +928,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           `Apna *Booking Ref #* type karein\n` +
           `_(Jaise: #SS123456 — confirmation message mein diya tha)_\n\n` +
           `Ya registered phone se 📞 call karein:\n` +
-          `+91-XXXXXXXXXX (9 AM - 9 PM)`,
+          `+91-9315576914 (9 AM - 9 PM)`,
           phoneNumberId, token
         );
       } else if (text === 'EB_RESCHEDULE') {
@@ -943,7 +936,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           `📅 *Reschedule Karein*\n\n` +
           `Naya preferred date aur time send karein:\n` +
           `_"Reschedule #SS123456 — 15 July, Afternoon"_\n\n` +
-          `Ya call karein: 📞 +91-XXXXXXXXXX\n` +
+          `Ya call karein: 📞 +91-9315576914\n` +
           `_2 ghante pehle tak free reschedule!_ ✅`,
           phoneNumberId, token
         );

@@ -79,7 +79,7 @@ const sofaShineConfig = {
     { id: 'Bed Cleaning',      emoji: '🛏️', desc: 'Single bed ₹299 · Double bed ₹550' },
     { id: 'Bathroom Cleaning', emoji: '🚿', desc: 'Full bathroom deep clean — ₹350' },
     { id: 'Chairs & Items',    emoji: '🪑', desc: 'Dining chair, study chair, fan, mirror' },
-    { id: 'Pest Control',      emoji: '🐜', desc: 'Cockroach, Ant & Insect Control' },
+    { id: 'Pest Control',      emoji: '🐜', desc: 'Cockroach, Bed Bugs & Termite — BHK-wise price' },
     { id: 'Other / Custom',    emoji: '💬', desc: 'Custom requirement — bata ke dekho!' },
   ],
   subServices: {
@@ -114,9 +114,16 @@ const sofaShineConfig = {
       { id: 'Mirror Cleaning', price: 50, section: '🔧 Small Items', desc: 'Streak-free clean · ₹50/mirror',      askQty: true },
     ],
     'Pest Control': [
-      { id: 'Cockroach Control', price: 499, desc: 'Gel + spray + 3 month warranty · ₹499' },
-      { id: 'Full Pest Control', price: 799, desc: 'All insects + rodent control · ₹799' },
-      { id: 'Ant Treatment',     price: 349, desc: 'Bait + spray treatment · ₹349' },
+      { id: 'Cockroach Control', price: 0, section: '🪳 Cockroach',
+        desc: '1BHK=₹749 · 2BHK=₹899 · 3BHK=₹1100 · 4BHK=₹1300 · 4mo warranty',
+        askCount: true, countLabel: 'BHK', unitPrice: 1300, priceMap: { 1: 749, 2: 899, 3: 1100, 4: 1300 } },
+      { id: 'Bed Bugs Control',  price: 0, section: '🛏️ Bed Bugs',
+        desc: '1BHK=₹999 · 2BHK=₹1299 · 3BHK=₹1799 · 4BHK=₹2199',
+        askCount: true, countLabel: 'BHK', unitPrice: 2199, priceMap: { 1: 999, 2: 1299, 3: 1799, 4: 2199 } },
+      { id: 'Termite Control',   price: 0, section: '🐛 Termite',
+        desc: '1BHK=₹1999 · 2BHK=₹2499 · 3BHK=₹3499 · 4BHK=₹4499',
+        askCount: true, countLabel: 'BHK', unitPrice: 4499, priceMap: { 1: 1999, 2: 2499, 3: 3499, 4: 4499 } },
+      { id: 'Ant Treatment',     price: 349, section: '🐜 Ants', desc: 'Bait + spray treatment · ₹349' },
     ],
   },
 };
@@ -307,8 +314,11 @@ const askService = async (to, biz, phoneNumberId, token) => {
 
 // ── Master Quick-Order (all services, text-based, one message) ────────────────
 
-const SOFA_PRICES    = { 2: 220, 3: 330, 4: 440, 5: 520, 6: 600, 7: 700, 8: 800, 9: 900 };
-const CUM_BED_PRICES = { 1: 300, 2: 450, 3: 650, 4: 850 };
+const SOFA_PRICES      = { 2: 220, 3: 330, 4: 440, 5: 520, 6: 600, 7: 700, 8: 800, 9: 900 };
+const CUM_BED_PRICES   = { 1: 300, 2: 450, 3: 650, 4: 850 };
+const COCKROACH_PRICES = { 1: 749, 2: 899, 3: 1100, 4: 1300 };
+const BED_BUG_PRICES   = { 1: 999, 2: 1299, 3: 1799, 4: 2199 };
+const TERMITE_PRICES   = { 1: 1999, 2: 2499, 3: 3499, 4: 4499 };
 
 // Last number in segment = quantity; for sofas, first number = seat count
 const getQty = (seg) => {
@@ -411,21 +421,36 @@ const parseMasterOrder = (rawText) => {
       continue;
     }
 
-    // 13. Pest Control — Cockroach
-    if (/cockroach|keeday/.test(seg)) {
-      items.push({ service: 'Pest Control', subService: 'Cockroach Control', price: 499, quantity: 1, unitPrice: 499 });
+    // 13. Bed Bugs (check before cockroach)
+    if (/bed\s*bug|khatmal/.test(seg)) {
+      const n = parseInt(seg.match(/\d+/)?.[0]);
+      const bhk = (n >= 1 && n <= 4) ? n : 1;
+      const price = BED_BUG_PRICES[bhk];
+      items.push({ service: 'Pest Control', subService: `Bed Bugs Control — ${bhk} BHK`, price, quantity: 1, unitPrice: price });
       continue;
     }
 
-    // 14. Pest Control — Ant
+    // 14. Termite Control
+    if (/termite|deemak/.test(seg)) {
+      const n = parseInt(seg.match(/\d+/)?.[0]);
+      const bhk = (n >= 1 && n <= 4) ? n : 1;
+      const price = TERMITE_PRICES[bhk];
+      items.push({ service: 'Pest Control', subService: `Termite Control — ${bhk} BHK`, price, quantity: 1, unitPrice: price });
+      continue;
+    }
+
+    // 15. Cockroach Control — BHK-based (749/899/1100/1300)
+    if (/cockroach|keeday/.test(seg)) {
+      const n = parseInt(seg.match(/\d+/)?.[0]);
+      const bhk = (n >= 1 && n <= 4) ? n : 1;
+      const price = COCKROACH_PRICES[bhk];
+      items.push({ service: 'Pest Control', subService: `Cockroach Control — ${bhk} BHK`, price, quantity: 1, unitPrice: price });
+      continue;
+    }
+
+    // 16. Ant Treatment (flat price)
     if (/\bant\b|chinti/.test(seg)) {
       items.push({ service: 'Pest Control', subService: 'Ant Treatment', price: 349, quantity: 1, unitPrice: 349 });
-      continue;
-    }
-
-    // 15. Full Pest Control
-    if (/full\s*pest|pest\s*control/.test(seg)) {
-      items.push({ service: 'Pest Control', subService: 'Full Pest Control', price: 799, quantity: 1, unitPrice: 799 });
       continue;
     }
   }
@@ -492,10 +517,23 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
 
     `━━━━━━━━━━━━━━━━━━\n` +
     `🐜 *PEST CONTROL*\n` +
-    `_Safe chemicals · long-lasting · 3 month warranty_\n` +
-    `• cockroach control  →  ₹499\n` +
-    `• ant treatment      →  ₹349\n` +
-    `• full pest control  →  ₹799`,
+    `_Safe chemicals · long-lasting · warranty included_\n\n` +
+    `🪳 *Cockroach Control* _(4 month warranty)_\n` +
+    `• 1 BHK  →  ₹749\n` +
+    `• 2 BHK  →  ₹899\n` +
+    `• 3 BHK  →  ₹1100\n` +
+    `• 4 BHK  →  ₹1300\n\n` +
+    `🛏️ *Bed Bugs Control*\n` +
+    `• 1 BHK  →  ₹999\n` +
+    `• 2 BHK  →  ₹1299\n` +
+    `• 3 BHK  →  ₹1799\n` +
+    `• 4 BHK  →  ₹2199\n\n` +
+    `🐛 *Termite Control*\n` +
+    `• 1 BHK  →  ₹1999\n` +
+    `• 2 BHK  →  ₹2499\n` +
+    `• 3 BHK  →  ₹3499\n` +
+    `• 4 BHK  →  ₹4499\n\n` +
+    `🐜 *Ant Treatment*  →  ₹349 _(flat)_`,
     phoneNumberId, token
   );
 
@@ -507,7 +545,8 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     `▸ _sofa 3, ottoman 2, cushion 3, table 2_\n` +
     `▸ _single bed 2, dining chair 4, fan 3_\n` +
     `▸ _sofa 4, scb 2, ottoman 2, single bed 1_\n` +
-    `▸ _bathroom 2, sofa 3, dining chair 6, table 1_\n\n` +
+    `▸ _cockroach 2bhk, sofa 3, bathroom 2_\n` +
+    `▸ _termite 3bhk, bed bug 2bhk_\n\n` +
     `_Ek hi message mein sab likho — bot sab samajh jaayega_ 👇`,
     phoneNumberId, token
   );
@@ -1043,21 +1082,24 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
       const match = subs.find((s) => s.id.toLowerCase() === text.toLowerCase() || s.id === text);
       if (!match) { await askSubService(from, biz, conv.data.service, phoneNumberId, token); break; }
 
-      // Seat-count items (5+ sofa, sofa cum bed 3-4) — ask for exact count
+      // Seat/BHK count items — ask for exact count
       if (match.askCount) {
-        const priceHint = match.priceMap
-          ? Object.entries(match.priceMap).map(([k, v]) => `${k} seat=₹${v}`).join(' · ')
-          : `₹${match.unitPrice || 100}/seat`;
+        const isBhk    = match.countLabel === 'BHK';
         const isCumBed = match.id.startsWith('Sofa Cum Bed');
+        const priceHint = match.priceMap
+          ? Object.entries(match.priceMap).map(([k, v]) => `${k}${isBhk ? ' BHK' : ' seat'}=₹${v}`).join(' · ')
+          : `₹${match.unitPrice || 100}/${isBhk ? 'BHK' : 'seat'}`;
         await save(conv, 'AWAITING_SEAT_COUNT', {
           pendingSubService: match.id,
           pendingUnitPrice:  match.unitPrice || 100,
           pendingPriceMap:   match.priceMap  || null,
         });
+        const question = isBhk
+          ? `Ghar mein kitna BHK hai?\n_(1, 2, 3 ya 4 type karein)_`
+          : `${isCumBed ? 'Sofa Cum Bed mein kitne seats hain?' : 'Sofa mein kitne seats hain?'}\n_(Sirf number type karein)_`;
         await sendText(from,
-          `🛋️ *${match.id}*\n\n` +
-          `${isCumBed ? 'Sofa Cum Bed mein kitne seats hain?' : 'Sofa mein kitne seats hain?'}\n` +
-          `_(Sirf number type karein)_\n\n` +
+          `${isBhk ? '🐜' : '🛋️'} *${match.id}*\n\n` +
+          `${question}\n\n` +
           `💰 ${priceHint}`,
           phoneNumberId, token
         );
@@ -1082,21 +1124,36 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
     // ── Seat Count Input (sofa 5+, sofa cum bed 3-4) ─────────────────────────
     case 'AWAITING_SEAT_COUNT': {
-      const seats = parseInt(text.trim());
-      if (isNaN(seats) || seats < 1 || seats > 50) {
-        await sendText(from, `⚠️ Seats ki number type karein (jaise: 3, 5 ya 7) 🙏`, phoneNumberId, token);
-        break;
+      const n      = parseInt(text.trim());
+      const subSvc = conv.data.pendingSubService || '';
+      const isPest = ['Cockroach Control', 'Bed Bugs Control', 'Termite Control'].some(s => subSvc.startsWith(s));
+
+      if (isPest) {
+        if (isNaN(n) || n < 1 || n > 4) {
+          await sendText(from, `⚠️ BHK number type karein: 1, 2, 3 ya 4 🙏`, phoneNumberId, token);
+          break;
+        }
+      } else {
+        if (isNaN(n) || n < 1 || n > 50) {
+          await sendText(from, `⚠️ Seats ki number type karein (jaise: 3, 5 ya 7) 🙏`, phoneNumberId, token);
+          break;
+        }
       }
+
       const priceMap  = conv.data.pendingPriceMap || {};
       const unitPrice = conv.data.pendingUnitPrice || 100;
-      const price     = priceMap[seats] !== undefined ? priceMap[seats] : seats * unitPrice;
-      const subSvc    = conv.data.pendingSubService || '';
-      const label     = subSvc.startsWith('Sofa Cum Bed')
-        ? `Sofa Cum Bed — ${seats} Seat`
-        : `Sofa — ${seats} Seats`;
-      const existing  = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
-      const isFirst   = existing.length === 0;
-      const cart      = [...existing, { service: conv.data.service, subService: label, price, quantity: 1, unitPrice: price }];
+      const price     = priceMap[n] !== undefined ? priceMap[n] : n * unitPrice;
+      let label;
+      if (isPest) {
+        label = `${subSvc} — ${n} BHK`;
+      } else if (subSvc.startsWith('Sofa Cum Bed')) {
+        label = `Sofa Cum Bed — ${n} Seat`;
+      } else {
+        label = `Sofa — ${n} Seats`;
+      }
+      const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+      const isFirst  = existing.length === 0;
+      const cart     = [...existing, { service: conv.data.service, subService: label, price, quantity: 1, unitPrice: price }];
       await sendText(from, `✅ *${label}* added!\n_(₹${price})_`, phoneNumberId, token);
       await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
       await showCart(from, cart, conv.data.service, phoneNumberId, token, isFirst);

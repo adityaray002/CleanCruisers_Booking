@@ -34,10 +34,10 @@ const sendList = async (to, header, body, sections, phoneNumberId, token) => {
 // ── Static content ────────────────────────────────────────────────────────────
 
 const REVIEWS = [
-  { name: 'Priya M., West Delhi',   star: '⭐⭐⭐⭐⭐', text: '"SofaShine ne mera 5-seater sofa bilkul naya kar diya! Team bohot professional thi. 100% recommend!"' },
-  { name: 'Rohit K., Dwarka',   star: '⭐⭐⭐⭐⭐', text: '"Kitchen deep clean ekdum perfect. Eco-friendly chemicals use kiye, smell bhi nahi aayi. Bahut satisfied!"' },
-  { name: 'Anita S., South Delhi', star: '⭐⭐⭐⭐⭐', text: '"Pay after service wali policy ne trust build kiya. Team time pe aayi, kaam excellent tha!"' },
-  { name: 'Vikram T., Janakpuri',  star: '⭐⭐⭐⭐⭐', text: '"3 sofas + carpet sab ek din mein done. Price bhi fair tha. Definitely book karunga dobara!"' },
+  { name: 'Priya M., West Delhi',   star: '⭐⭐⭐⭐⭐', text: '"The sofa cleaning service was excellent.They did their work very neatly and professionally. All the old stains and dust were completely removed, and the sofa looks as good as new. The service was quick, affordable, and highly satisfying. I would definitely recommend it to others.!"' },
+  { name: 'Rohit K., Dwarka',   star: '⭐⭐⭐⭐⭐', text: '"I really loved this! Fantastic service my washroom is really shinning. A big drastic change before and after cleaning.You should absolutely try it."' },
+  { name: 'Anita S., South Delhi', star: '⭐⭐⭐⭐⭐', text: '"Had a very interaction with the owner. The staff was also skilled and professional. Enjoyed their service."' },
+  { name: 'Vikram T., Janakpuri',  star: '⭐⭐⭐⭐⭐', text: '"My place looks fresh and spotless after their visit.Happy customer"' },
 ];
 
 const AREAS_TEXT =

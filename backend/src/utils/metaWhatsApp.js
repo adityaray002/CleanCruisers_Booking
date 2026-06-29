@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const BASE = 'https://graph.facebook.com/v19.0';
+const BASE = 'https://graph.facebook.com/v22.0';
 
 const post = (phoneNumberId, token, body) =>
   axios.post(`${BASE}/${phoneNumberId}/messages`, body, {

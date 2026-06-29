@@ -452,25 +452,31 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     `• sofa 9 seat  →  ₹900\n` +
     `• sofa 10+ seat  →  ₹100/seat\n\n` +
 
-    `🛋️ *SOFA CUM BED*\n` +
-    `_Full sofa + bed clean · fresh & odour-free_\n` +
-    `• scb 1 seat  →  ₹300\n` +
-    `• scb 2 seat  →  ₹450\n` +
-    `• scb 3 seat  →  ₹650\n` +
-    `• scb 4 seat  →  ₹850\n\n` +
-
+   
+    `━━━━━━━━━━━━━━━━━━\n` +
     `🪑 *SOFA EXTRAS*\n` +
     `_Cushions, table, accessories ki cleaning_\n` +
     `• ottoman  →  ₹80 / piece\n` +
     `• table    →  ₹150 / table\n` +
     `• cushion  →  ₹20 / cover\n\n` +
 
-    `━━━━━━━━━━━━━━━━━━\n` +
+
+     `━━━━━━━━━━━━━━━━━━\n` +
     `🛏️ *BED CLEANING*\n` +
     `_UV sanitize + steam + mite removal · safe & fresh_\n` +
     `• single bed  →  ₹299\n` +
     `• double bed  →  ₹550\n\n` +
 
+
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🛋️ *SOFA CUM BED*\n` +
+    `_Full sofa + bed clean · fresh & odour-free_\n` +
+    `• scb 1 seat  →  ₹300\n` +
+    `• scb 2 seat  →  ₹450\n` +
+    `• scb 3 seat  →  ₹650\n` +
+    `• scb 4 seat  →  ₹850\n\n` +
+  
+   
     `━━━━━━━━━━━━━━━━━━\n` +
     `🚿 *BATHROOM CLEANING*\n` +
     `_Tiles + grout + fixtures + complete sanitize_\n` +
@@ -843,7 +849,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         case 'MENU_EXPERT':
           await sendText(from,
             `💬 *Hamare Expert Se Baat Karein*\n\n` +
-            `📞 Call: +91-XXXXXXXXXX\n` +
+            `📞 Call: +91-9315576914\n` +
             `⏰ Available: 9 AM – 9 PM, 7 days\n\n` +
             `Ya yahan message karein — *15 minutes* mein response guaranteed! 🙏\n\n` +
             `_Hamare team ka koi bhi sawaal miss nahi karta._ ✅`,

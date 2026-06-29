@@ -34,10 +34,10 @@ const sendList = async (to, header, body, sections, phoneNumberId, token) => {
 // ── Static content ────────────────────────────────────────────────────────────
 
 const REVIEWS = [
-  { name: 'Priya M., Noida',   star: '⭐⭐⭐⭐⭐', text: '"SofaShine ne mera 5-seater sofa bilkul naya kar diya! Team bohot professional thi. 100% recommend!"' },
-  { name: 'Rohit K., Delhi',   star: '⭐⭐⭐⭐⭐', text: '"Kitchen deep clean ekdum perfect. Eco-friendly chemicals use kiye, smell bhi nahi aayi. Bahut satisfied!"' },
-  { name: 'Anita S., Gurgaon', star: '⭐⭐⭐⭐⭐', text: '"Pay after service wali policy ne trust build kiya. Team time pe aayi, kaam excellent tha!"' },
-  { name: 'Vikram T., Noida',  star: '⭐⭐⭐⭐⭐', text: '"3 sofas + carpet sab ek din mein done. Price bhi fair tha. Definitely book karunga dobara!"' },
+  { name: 'Priya M., West Delhi',   star: '⭐⭐⭐⭐⭐', text: '"SofaShine ne mera 5-seater sofa bilkul naya kar diya! Team bohot professional thi. 100% recommend!"' },
+  { name: 'Rohit K., Dwarka',   star: '⭐⭐⭐⭐⭐', text: '"Kitchen deep clean ekdum perfect. Eco-friendly chemicals use kiye, smell bhi nahi aayi. Bahut satisfied!"' },
+  { name: 'Anita S., South Delhi', star: '⭐⭐⭐⭐⭐', text: '"Pay after service wali policy ne trust build kiya. Team time pe aayi, kaam excellent tha!"' },
+  { name: 'Vikram T., Janakpuri',  star: '⭐⭐⭐⭐⭐', text: '"3 sofas + carpet sab ek din mein done. Price bhi fair tha. Definitely book karunga dobara!"' },
 ];
 
 const AREAS_TEXT =
@@ -60,7 +60,7 @@ const OFFERS_TEXT =
   `⏰ _Offers limited time ke liye hain. Abhi book karein!_`;
 
 const FAQ = {
-  'Pricing & Payment': `💰 Rates market se 20% kam hain!\n\n🛋️ Sofa: ₹110/seat se shuru\n🏠 Kitchen: ₹699\n🏡 1 BHK: ₹2499\n\n💳 *Payment SIRF kaam complete hone ke baad!*\nCash, UPI, card — sab accept hota hai. Koi advance nahi!`,
+  'Pricing & Payment': `💰 Rates market se 20% kam hain!\n\n🛋️ Sofa: ₹220 se shuru (2-seat)\n🛏️ Bed cleaning: ₹299 se\n🏠 Carpet: ₹300 se\n🚿 Bathroom: ₹350\n🪑 Dining chair: ₹80/chair\n\n💳 *Payment SIRF kaam complete hone ke baad!*\nCash, UPI, card — sab accept hota hai. Koi advance nahi!`,
   'How Long It Takes': `⏱️ *Service Duration:*\n\n🛋️ Sofa (2-3 seat): 1-1.5 ghanta\n🛏️ Mattress: 30-45 min\n🏠 Kitchen: 2-3 ghante\n🏡 Full 1 BHK: 4-5 ghante\n🏡 Full 2 BHK: 6-7 ghante\n\nHum time waaste nahi karte! ⚡`,
   'Chemicals & Safety': `🌿 *100% Eco-Friendly Chemicals*\n\nHamare products:\n✅ Bachon ke liye safe\n✅ Pets ke liye safe\n✅ Koi strong smell nahi\n✅ ISO certified cleaning agents\n✅ Surfaces damage nahi karte\n\nAap ghar mein reh sakte ho service ke dauran! 🏠`,
   'Cancellation Policy': `📋 *Flexible Cancellation:*\n\n✅ *2 ghante pehle:* Free cancel/reschedule\n⚠️ *1-2 ghante:* 50% cancellation fee\n❌ *Last minute:* Full charge\n\n_WhatsApp pe message karein — seedha response milega!_ 💬`,
@@ -75,43 +75,54 @@ const sofaShineConfig = {
   tagline: 'Expert Cleaning at Your Doorstep',
   token:   () => process.env.SOFASHINE_META_TOKEN,
   services: [
-    { id: 'Home Cleaning',      emoji: '🛋️', desc: 'Sofa, Mattress, Carpet, Chairs' },
-    { id: 'Deep Cleaning',      emoji: '🏠', desc: 'Bathroom, Kitchen, Full Home, Office' },
-    { id: 'Appliance Cleaning', emoji: '🔧', desc: 'AC, Fridge, Microwave, Fan, Gas Stove' },
+    { id: 'Sofa Cleaning',      emoji: '🛋️', desc: 'Regular sofa — 2 se 9 seats tak' },
+    { id: 'Bed & Sofa Cum Bed', emoji: '🛏️', desc: 'Single/Double bed + Sofa Cum Bed' },
+    { id: 'Bathroom Cleaning',  emoji: '🚿', desc: 'Full bathroom deep clean — ₹350' },
+    { id: 'Chairs & Items',     emoji: '🪑', desc: 'Dining, study, ottoman, fan, mirror' },
+    { id: 'Carpet & Windows',   emoji: '🏠', desc: 'Carpet by size, windows, curtains' },
     { id: 'Pest Control',       emoji: '🐜', desc: 'Cockroach, Ant & Insect Control' },
     { id: 'Other / Custom',     emoji: '💬', desc: 'Custom requirement — bata ke dekho!' },
   ],
   subServices: {
-    'Home Cleaning': [
-      // Sofa — seat-based pricing (max 5 rows in this section)
-      { id: 'Sofa — 2 Seats',  price: 220, section: '🛋️ Sofa Cleaning', desc: 'Steam + stain treat + dry · ₹220' },
-      { id: 'Sofa — 3 Seats',  price: 330, section: '🛋️ Sofa Cleaning', desc: 'Steam + stain treat + dry · ₹330' },
-      { id: 'Sofa — 4 Seats',  price: 440, section: '🛋️ Sofa Cleaning', desc: 'Steam + stain treat + dry · ₹440' },
-      { id: 'Sofa — L-Shape',  price: 600, section: '🛋️ Sofa Cleaning', desc: 'Full steam + fabric care · ₹600' },
-      { id: 'Sofa — 5+ Seats', price:   0, section: '🛋️ Sofa Cleaning', desc: 'Premium steam clean · ₹100/seat', askCount: true },
-      // Other items — quantity-based (max 5 rows — total stays at 10, WhatsApp limit)
-      { id: 'Mattress',        price: 299, section: '🏠 Other Items', desc: 'UV sanitize + mite removal · ₹299', askQty: true },
-      { id: 'Carpet',          price: 399, section: '🏠 Other Items', desc: 'Dry + steam + stain removal · ₹399', askQty: true },
-      { id: 'Dining Chair',    price:  90, section: '🏠 Other Items', desc: 'Fabric clean + deodorize · ₹90',   askQty: true },
-      { id: 'Office Chair',    price: 120, section: '🏠 Other Items', desc: 'Full upholstery clean · ₹120',     askQty: true },
-      { id: 'Curtains (pair)', price: 149, section: '🏠 Other Items', desc: 'Steam + dust removal · ₹149',      askQty: true },
+    'Sofa Cleaning': [
+      { id: 'Sofa — 2 Seats',   price: 220, desc: 'Steam + stain treat + dry · ₹220' },
+      { id: 'Sofa — 3 Seats',   price: 330, desc: 'Steam + stain treat + dry · ₹330' },
+      { id: 'Sofa — 4 Seats',   price: 440, desc: 'Steam + stain treat + dry · ₹440' },
+      { id: 'Sofa — 5 Seats',   price: 520, desc: 'Steam + stain treat + dry · ₹520' },
+      { id: 'Sofa — 6 Seats',   price: 600, desc: 'Deep steam + fabric care · ₹600' },
+      { id: 'Sofa — 7 Seats',   price: 700, desc: 'Deep steam + fabric care · ₹700' },
+      { id: 'Sofa — 8 Seats',   price: 800, desc: 'Deep steam + fabric care · ₹800' },
+      { id: 'Sofa — 9 Seats',   price: 900, desc: 'Deep steam + fabric care · ₹900' },
+      { id: 'Sofa — 10+ Seats', price:   0, desc: '₹100/seat — aapke seats bataiye', askCount: true },
     ],
-    'Deep Cleaning': [
-      { id: 'Bathroom Cleaning', price: 299,  desc: 'Tiles + grout scrub + sanitize · ₹299' },
-      { id: 'Kitchen Cleaning',  price: 699,  desc: 'Chimney + stove + sink + tiles · ₹699' },
-      { id: '1 BHK Full Home',   price: 2499, desc: 'All rooms + kitchen + bathroom · ₹2499' },
-      { id: '2 BHK Full Home',   price: 3499, desc: '2 bed + kitchen + bathrooms · ₹3499' },
-      { id: '3 BHK Full Home',   price: 4499, desc: '3 bed + kitchen + bathrooms · ₹4499' },
-      { id: 'Office Deep Clean', price: 1999, desc: 'Workstations + washroom + floor · ₹1999' },
+    'Bed & Sofa Cum Bed': [
+      { id: 'Single Bed',          price: 299, section: '🛏️ Bed Cleaning',  desc: 'Steam + sanitize + dry · ₹299' },
+      { id: 'Double Bed',          price: 550, section: '🛏️ Bed Cleaning',  desc: 'Steam + sanitize + dry · ₹550' },
+      { id: 'Sofa Cum Bed 1 Seat', price: 300, section: '🛋️ Sofa Cum Bed', desc: 'Full clean + dry · ₹300' },
+      { id: 'Sofa Cum Bed 2 Seat', price: 450, section: '🛋️ Sofa Cum Bed', desc: 'Full clean + dry · ₹450' },
+      { id: 'Sofa Cum Bed 3 Seat', price: 650, section: '🛋️ Sofa Cum Bed', desc: 'Full clean + dry · ₹650' },
+      { id: 'Sofa Cum Bed 4 Seat', price: 850, section: '🛋️ Sofa Cum Bed', desc: 'Full clean + dry · ₹850' },
     ],
-    'Appliance Cleaning': [
-      { id: 'AC Service',        price: 349, desc: 'Filter + coil + drain clean · ₹349',    askQty: true },
-      { id: 'Refrigerator',      price: 299, desc: 'Inside + outside + coils + seals · ₹299' },
-      { id: 'Microwave',         price: 149, desc: 'Inside + outside + turntable · ₹149' },
-      { id: 'Gas Stove',         price:  99, desc: 'Burners + grates + surface · ₹99' },
-      { id: 'Ceiling Fan',       price:  59, desc: 'Blades + housing + motor · ₹59',        askQty: true },
-      { id: 'Exhaust Fan',       price:  79, desc: 'Blades + filter + motor clean · ₹79' },
-      { id: 'Kitchen Window',    price: 199, desc: 'Glass + frame + tracks · ₹199' },
+    'Bathroom Cleaning': [
+      { id: 'Bathroom Deep Clean', price: 350, desc: 'Tiles + grout + fixtures + sanitize · ₹350' },
+    ],
+    'Chairs & Items': [
+      { id: 'Dining Chair',       price:  80, section: '🪑 Chairs',      desc: 'Fabric clean + deodorize · ₹80/chair',  askQty: true },
+      { id: 'Study Chair',        price: 150, section: '🪑 Chairs',      desc: 'Full upholstery clean · ₹150/chair',    askQty: true },
+      { id: 'Ottoman / Puffy',    price:  80, section: '🪑 Chairs',      desc: 'Clean + deodorize · ₹80/piece',         askQty: true },
+      { id: 'Sofa Central Table', price: 150, section: '🪑 Chairs',      desc: 'Surface clean + polish · ₹150' },
+      { id: 'Fan Cleaning',       price:  75, section: '🔧 Small Items', desc: 'Blades + housing clean · ₹75/fan',      askQty: true },
+      { id: 'Mirror Cleaning',    price:  50, section: '🔧 Small Items', desc: 'Streak-free clean · ₹50/mirror',        askQty: true },
+      { id: 'Cushion Cover',      price:  20, section: '🔧 Small Items', desc: 'Cover wash + dry · ₹20/cover',          askQty: true },
+    ],
+    'Carpet & Windows': [
+      { id: 'Carpet upto 25 sqft',  price: 300, section: '🏠 Carpet Cleaning', desc: 'Dry + steam + stain removal · ₹300' },
+      { id: 'Carpet 25-50 sqft',    price: 450, section: '🏠 Carpet Cleaning', desc: 'Dry + steam + stain removal · ₹450' },
+      { id: 'Carpet 50-100 sqft',   price: 650, section: '🏠 Carpet Cleaning', desc: 'Deep dry + steam clean · ₹650' },
+      { id: 'Carpet 100-150 sqft',  price: 950, section: '🏠 Carpet Cleaning', desc: 'Deep dry + steam clean · ₹950' },
+      { id: 'Window (Bedroom)',     price: 300, section: '🪟 Windows',          desc: 'Glass + frame + tracks · ₹300' },
+      { id: 'Window (Living Room)', price: 600, section: '🪟 Windows',          desc: 'Glass + frame + tracks · ₹600' },
+      { id: 'Curtains (pair)',      price: 149, section: '🪟 Windows',          desc: 'Steam + dust removal · ₹149/pair', askQty: true },
     ],
     'Pest Control': [
       { id: 'Cockroach Control', price: 499, desc: 'Gel + spray + 3 month warranty · ₹499' },
@@ -166,9 +177,11 @@ const BUSINESSES = {
 
 // Upsell suggestion per service (shown after first item added to cart)
 const UPSELL = {
-  'Home Cleaning':      { emoji: '🛏️', text: 'Sofa ke saath Mattress cleaning bhi add karein? Sirf ₹299 mein — ekdum naya feel aayega! ✨' },
-  'Deep Cleaning':      { emoji: '🚿', text: 'Kitchen ke saath Bathroom bhi karwayein? ₹299 extra mein — ek trip mein sab ho jaayega!' },
-  'Appliance Cleaning': { emoji: '🌀', text: 'AC ke saath Ceiling Fan bhi add karein sirf ₹59 mein! Team already aayegi toh sab clean ho jaayega.' },
+  'Sofa Cleaning':      { emoji: '🛏️', text: 'Sofa ke saath Bed cleaning bhi add karein? Single bed sirf ₹299 mein! ✨' },
+  'Bed & Sofa Cum Bed': { emoji: '🛋️', text: 'Bed ke saath Sofa bhi clean karwayein? 2-seater sirf ₹220 mein — ekdum naya feel!' },
+  'Bathroom Cleaning':  { emoji: '🏠', text: 'Bathroom ke saath Carpet bhi add karein? Small carpet sirf ₹300 extra! ✨' },
+  'Chairs & Items':     { emoji: '🛋️', text: 'Chairs ke saath Sofa bhi clean karein? 2-seater ₹220 mein — team already aa rahi hai!' },
+  'Carpet & Windows':   { emoji: '🛋️', text: 'Carpet ke saath Sofa bhi karwayein? 2-seater sirf ₹220 mein — ek baar mein sab done!' },
   'Pest Control':       { emoji: '🏠', text: 'Sirf ₹300 extra mein full home pest control upgrade karein — cockroach + ants + all insects!' },
 };
 
@@ -262,15 +275,15 @@ const sendWelcome = async (to, biz, phoneNumberId, token, isReturning = false) =
         title: '🏠 Cleaning Services',
         rows: [
           { id: 'MENU_BOOK',   title: '🧹 Book Cleaning',  description: 'Service schedule karein' },
-          { id: 'MENU_PRICE',  title: '💰 Price List',      description: 'Sabhi services ke rates' },
-          { id: 'MENU_OFFERS', title: '🎁 Today\'s Offers', description: 'Special discounts aaj' },
+        //  { id: 'MENU_PRICE',  title: '💰 Price List',      description: 'Sabhi services ke rates' },
+         // { id: 'MENU_OFFERS', title: '🎁 Today\'s Offers', description: 'Special discounts aaj' },
         ],
       },
       {
         title: '📋 More Info',
         rows: [
           { id: 'MENU_REVIEWS', title: '⭐ Customer Reviews',  description: 'Happy customers ki baat' },
-          { id: 'MENU_AREAS',   title: '📍 Areas We Serve',   description: 'Coverage check karo' },
+        //  { id: 'MENU_AREAS',   title: '📍 Areas We Serve',   description: 'Coverage check karo' },
           { id: 'MENU_FAQ',     title: '❓ FAQ',               description: 'Common sawalon ke jawab' },
         ],
       },
@@ -322,10 +335,11 @@ const askSubService = async (to, biz, service, phoneNumberId, token) => {
   const sections = Object.entries(sectionMap).map(([title, rows]) => ({ title, rows }));
 
   const trustLine = {
-    'Home Cleaning':      '🛋️ Steam cleaning | Dries in 2-4 hrs | Odour-free',
-    'Deep Cleaning':      '🏠 Trained professionals | Eco-friendly | Spotless guarantee',
-    'Appliance Cleaning': '🔧 Genuine techniques | Better performance assured',
-    'Pest Control':       '🐜 Safe chemicals | Long-lasting protection',
+    'Sofa Cleaning':      '🛋️ Steam cleaning | Dries in 2-4 hrs | Odour-free',
+    'Bed & Sofa Cum Bed': '🛏️ UV sanitize + steam | Mite removal | Safe & fresh',
+    'Chairs & Items':     '🪑 Eco-friendly clean | Safe chemicals | Quick dry',
+    'Carpet & Windows':   '🏠 Deep clean + stain removal | Streak-free windows',
+    'Pest Control':       '🐜 Safe chemicals | Long-lasting protection | Warranty',
   }[service] || '✨ Professional service guaranteed';
 
   await sendList(to,
@@ -740,6 +754,17 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         break;
       }
 
+      // Single fixed-price service (Bathroom Cleaning etc.) → skip sub-list, add to cart directly
+      const subs = biz.subServices[match.id] || [];
+      if (subs.length === 1 && !subs[0].askCount && !subs[0].askQty && subs[0].price > 0) {
+        const item = { service: match.id, subService: subs[0].id, price: subs[0].price, quantity: 1, unitPrice: subs[0].price };
+        const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+        const cart = [...existing, item];
+        await save(conv, 'AWAITING_ADD_MORE', { service: match.id, leadId, selectedServices: cart });
+        await showCart(from, cart, match.id, phoneNumberId, token, existing.length === 0);
+        break;
+      }
+
       await save(conv, 'AWAITING_SUBSERVICE', { service: match.id, leadId });
       await askSubService(from, biz, match.id, phoneNumberId, token);
       break;
@@ -769,7 +794,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
       const match = subs.find((s) => s.id.toLowerCase() === text.toLowerCase() || s.id === text);
       if (!match) { await askSubService(from, biz, conv.data.service, phoneNumberId, token); break; }
 
-      // 6+ seat sofa — ask for seat count
+      // 10+ seat sofa — ask for seat count
       if (match.askCount) {
         await save(conv, 'AWAITING_SEAT_COUNT', { pendingSubService: match.id, pendingUnitPrice: 100 });
         await sendText(from,

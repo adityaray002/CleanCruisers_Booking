@@ -13,6 +13,7 @@ const conversationSchema = new mongoose.Schema({
       'AWAITING_CUSTOM_REQUEST',
       'AWAITING_QUANTITY',
       'AWAITING_SEAT_COUNT',
+      'AWAITING_QUICK_ORDER',
       'AWAITING_ADD_MORE',
       'AWAITING_DATE',
       'AWAITING_TIME_GROUP',

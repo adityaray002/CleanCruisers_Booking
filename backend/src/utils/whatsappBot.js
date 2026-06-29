@@ -305,6 +305,81 @@ const askService = async (to, biz, phoneNumberId, token) => {
   );
 };
 
+// ── Sofa Quick-Order (multi-select, text-based) ───────────────────────────────
+
+const SOFA_PRICES    = { 2: 220, 3: 330, 4: 440, 5: 520, 6: 600, 7: 700, 8: 800, 9: 900 };
+const CUM_BED_PRICES = { 1: 300, 2: 450, 3: 650, 4: 850 };
+
+const parseQuickOrder = (rawText) => {
+  const segments = rawText.toLowerCase().split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+  const items = [];
+
+  for (const seg of segments) {
+    // 1. Sofa Cum Bed (check before regular sofa — has "sofa" in name)
+    if (/sofa\s*cum\s*bed|cum\s*bed|\bscb\b/.test(seg)) {
+      const n = parseInt(seg.match(/(\d+)/)?.[1]);
+      if (n && CUM_BED_PRICES[n]) {
+        items.push({ service: 'Sofa Cleaning', subService: `Sofa Cum Bed — ${n} Seat`, price: CUM_BED_PRICES[n], quantity: 1, unitPrice: CUM_BED_PRICES[n] });
+      }
+      continue;
+    }
+
+    // 2. Regular sofa — number = seat count
+    if (/sofa|seater|seat/.test(seg)) {
+      const n = parseInt(seg.match(/(\d+)/)?.[1]);
+      if (n && SOFA_PRICES[n]) {
+        items.push({ service: 'Sofa Cleaning', subService: `Sofa — ${n} Seats`, price: SOFA_PRICES[n], quantity: 1, unitPrice: SOFA_PRICES[n] });
+        continue;
+      }
+    }
+
+    // 3. Ottoman / Puffy — number = quantity
+    if (/ottoman|puffy|\bott\b/.test(seg)) {
+      const qty = Math.max(1, parseInt(seg.match(/(\d+)/)?.[1]) || 1);
+      items.push({ service: 'Sofa Cleaning', subService: 'Ottoman / Puffy', price: 80 * qty, quantity: qty, unitPrice: 80 });
+      continue;
+    }
+
+    // 4. Central Table
+    if (/table/.test(seg)) {
+      items.push({ service: 'Sofa Cleaning', subService: 'Central Table', price: 150, quantity: 1, unitPrice: 150 });
+      continue;
+    }
+
+    // 5. Cushion Cover — number = quantity
+    if (/cushion|cush/.test(seg)) {
+      const qty = Math.max(1, parseInt(seg.match(/(\d+)/)?.[1]) || 1);
+      items.push({ service: 'Sofa Cleaning', subService: 'Cushion Cover', price: 20 * qty, quantity: qty, unitPrice: 20 });
+      continue;
+    }
+  }
+
+  return items;
+};
+
+const sendSofaPriceCard = async (to, phoneNumberId, token) => {
+  await sendText(to,
+    `🛋️ *SOFA CLEANING — PRICE MENU*\n\n` +
+    `*Regular Sofa:*\n` +
+    `2 seat → ₹220   |   3 seat → ₹330\n` +
+    `4 seat → ₹440   |   5 seat → ₹520\n` +
+    `6 seat → ₹600   |   7 seat → ₹700\n` +
+    `8 seat → ₹800   |   9 seat → ₹900\n\n` +
+    `*Sofa Cum Bed:*\n` +
+    `1 seat → ₹300   |   2 seat → ₹450\n` +
+    `3 seat → ₹650   |   4 seat → ₹850\n\n` +
+    `*Sofa Extras:*\n` +
+    `🛏️ Ottoman/Puffy → ₹80/piece\n` +
+    `🪵 Central Table → ₹150\n` +
+    `🛋️ Cushion Cover → ₹20/cover\n\n` +
+    `✍️ *Apna poora order ek saath type karein:*\n` +
+    `_Example: "sofa 3, ottoman 2, cushion 3, table"_\n` +
+    `_Ya: "sofa cum bed 2, ottoman 1, cushion 4"_\n\n` +
+    `_(Har item comma se alag karein, quantity saath mein likhein)_`,
+    phoneNumberId, token
+  );
+};
+
 // Sub-service selection — supports multi-section layout (grouped by section field)
 const askSubService = async (to, biz, service, phoneNumberId, token) => {
   const subs = biz.subServices[service] || [];
@@ -741,6 +816,13 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         break;
       }
 
+      // Sofa Cleaning → text-based multi-select (bypass WhatsApp list)
+      if (match.id === 'Sofa Cleaning') {
+        await save(conv, 'AWAITING_QUICK_ORDER', { service: match.id, leadId });
+        await sendSofaPriceCard(from, phoneNumberId, token);
+        break;
+      }
+
       // Single fixed-price service (Bathroom Cleaning etc.) → skip sub-list, add to cart directly
       const subs = biz.subServices[match.id] || [];
       if (subs.length === 1 && !subs[0].askCount && !subs[0].askQty && subs[0].price > 0) {
@@ -772,6 +854,29 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
       const cart     = [...existing, { service: 'Other / Custom', subService: text.trim(), price: 0, quantity: 1, unitPrice: 0 }];
       await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
       await showCart(from, cart, 'Other / Custom', phoneNumberId, token, false);
+      break;
+    }
+
+    // ── Sofa Quick Order (multi-select, text input) ───────────────────────────
+    case 'AWAITING_QUICK_ORDER': {
+      const newItems = parseQuickOrder(text);
+      if (newItems.length === 0) {
+        await sendText(from,
+          `⚠️ Kuch samajh nahi aaya!\n\n` +
+          `*Aise type karein:*\n` +
+          `"sofa 3, ottoman 2, cushion 3"\n` +
+          `"sofa cum bed 2, table"\n` +
+          `"sofa 4, sofa cum bed 1, ottoman 3, cushion 5"\n\n` +
+          `_Ya "menu" type karein wapas jaane ke liye._`,
+          phoneNumberId, token
+        );
+        await sendSofaPriceCard(from, phoneNumberId, token);
+        break;
+      }
+      const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+      const cart = [...existing, ...newItems];
+      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
+      await showCart(from, cart, 'Sofa Cleaning', phoneNumberId, token, existing.length === 0);
       break;
     }
 

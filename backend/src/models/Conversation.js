@@ -35,6 +35,9 @@ const conversationSchema = new mongoose.Schema({
     name:             String,
     leadId:           String,
     selectedServices: { type: mongoose.Schema.Types.Mixed, default: [] },
+    pendingSubService: String,
+    pendingUnitPrice:  Number,
+    pendingPriceMap:   { type: mongoose.Schema.Types.Mixed },
   },
   lastActivity: { type: Date, default: Date.now },
 }, { timestamps: true });

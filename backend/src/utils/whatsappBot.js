@@ -277,9 +277,8 @@ const sendWelcome = async (to, biz, phoneNumberId, token, isReturning = false) =
       {
         title: '📋 More Info',
         rows: [
-        //  { id: 'MENU_REVIEWS', title: '⭐ Customer Reviews',  description: 'Happy customers ki baat' },
-        //  { id: 'MENU_AREAS',   title: '📍 Areas We Serve',   description: 'Coverage check karo' },
-        //  { id: 'MENU_FAQ',     title: '❓ FAQ',               description: 'Common sawalon ke jawab' },
+          { id: 'MENU_REVIEWS', title: '⭐ Customer Reviews',  description: 'Happy customers ki baat' },
+          { id: 'MENU_FAQ',     title: '❓ FAQ',               description: 'Common sawalon ke jawab' },
         ],
       },
       {

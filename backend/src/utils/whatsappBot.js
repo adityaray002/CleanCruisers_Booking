@@ -321,20 +321,22 @@ const parseMasterOrder = (rawText) => {
   const items = [];
 
   for (const seg of segments) {
-    // 1. Sofa Cum Bed — number = seat count (check BEFORE regular sofa)
+    // 1. Sofa Cum Bed — number = seat count (1-4 fixed price, 5+ = ₹200/seat)
     if (/sofa\s*cum\s*bed|cum\s*bed|\bscb\b/.test(seg)) {
       const n = parseInt(seg.match(/\d+/)?.[0]);
-      if (n && CUM_BED_PRICES[n]) {
-        items.push({ service: 'Sofa Cleaning', subService: `Sofa Cum Bed — ${n} Seat`, price: CUM_BED_PRICES[n], quantity: 1, unitPrice: CUM_BED_PRICES[n] });
+      if (n >= 1) {
+        const price = CUM_BED_PRICES[n] ?? n * 200;
+        items.push({ service: 'Sofa Cleaning', subService: `Sofa Cum Bed — ${n} Seat`, price, quantity: 1, unitPrice: price });
       }
       continue;
     }
 
-    // 2. Regular Sofa — number = seat count (NOT quantity)
+    // 2. Regular Sofa — number = seat count (2-9 fixed price, 10+ = ₹100/seat)
     if (/\bsofa\b|\bseater\b/.test(seg)) {
       const n = parseInt(seg.match(/\d+/)?.[0]);
-      if (n && SOFA_PRICES[n]) {
-        items.push({ service: 'Sofa Cleaning', subService: `Sofa — ${n} Seats`, price: SOFA_PRICES[n], quantity: 1, unitPrice: SOFA_PRICES[n] });
+      if (n >= 2) {
+        const price = SOFA_PRICES[n] ?? n * 100;
+        items.push({ service: 'Sofa Cleaning', subService: `Sofa — ${n} Seats`, price, quantity: 1, unitPrice: price });
         continue;
       }
     }
@@ -447,7 +449,8 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     `• sofa 6 seat  →  ₹600\n` +
     `• sofa 7 seat  →  ₹700\n` +
     `• sofa 8 seat  →  ₹800\n` +
-    `• sofa 9 seat  →  ₹900\n\n` +
+    `• sofa 9 seat  →  ₹900\n` +
+    `• sofa 10+ seat  →  ₹100/seat\n\n` +
 
     `🛋️ *SOFA CUM BED*\n` +
     `_Full sofa + bed clean · fresh & odour-free_\n` +

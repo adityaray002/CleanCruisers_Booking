@@ -542,11 +542,7 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     `✍️ *Apna poora order ek saath type karein!*\n\n` +
     `📌 _Quantity saath mein likho, comma se alag karo_\n\n` +
     `*Examples:*\n` +
-    `▸ _sofa 3, ottoman 2, cushion 3, table 2_\n` +
-    `▸ _single bed 2, dining chair 4, fan 3_\n` +
-    `▸ _sofa 4, scb 2, ottoman 2, single bed 1_\n` +
-    `▸ _cockroach 2bhk, sofa 3, bathroom 2_\n` +
-    `▸ _termite 3bhk, bed bug 2bhk_\n\n` +
+    `▸ _sofa 3, ottoman 2, cushion 3, table 2_\n` 
     `_Ek hi message mein sab likho — bot sab samajh jaayega_ 👇`,
     phoneNumberId, token
   );

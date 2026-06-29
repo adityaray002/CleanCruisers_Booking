@@ -517,18 +517,14 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     phoneNumberId, token
   );
 
-  // Message 2 — ordering prompt with button CTA
-  await sendButtons(to,
+  // Message 2 — ordering prompt
+  await sendText(to,
     `✍️ *Order kaise karein?*\n\n` +
     `Upar se price dekho, phir *neeche type karein* — items ka naam aur quantity, comma se alag:\n\n` +
     `📌 *sofa 3, ottoman 2, bathroom 1*\n` +
     `📌 *cockroach 2bhk, single bed 2*\n` +
     `📌 *dining chair 4, fan 3, mirror 2*\n\n` +
     `_Ek hi message mein sab likho — bot samajh jaayega!_ 👇`,
-    [
-      { id: 'PRICE_CARD_AGAIN', title: '💰 Price List Phir Dekho' },
-      { id: 'MENU_EXPERT',      title: '💬 Expert Se Puchho' },
-    ],
     phoneNumberId, token
   );
 };

@@ -517,13 +517,18 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     phoneNumberId, token
   );
 
-  // Message 2 — ordering prompt (last message = always visible at bottom of chat)
-  await sendText(to,
-    `✍️ *Apna poora order ek saath type karein!*\n\n` +
-    `📌 _Quantity saath mein likho, comma se alag karo_\n\n`
-    `*Examples:*\n` +
-    `▸ _sofa 3, ottoman 2, cushion 3, table 2_\n` 
-    `_Ek hi message mein sab likho — bot sab samajh jaayega_ 👇`,
+  // Message 2 — ordering prompt with button CTA
+  await sendButtons(to,
+    `✍️ *Order kaise karein?*\n\n` +
+    `Upar se price dekho, phir *neeche type karein* — items ka naam aur quantity, comma se alag:\n\n` +
+    `📌 *sofa 3, ottoman 2, bathroom 1*\n` +
+    `📌 *cockroach 2bhk, single bed 2*\n` +
+    `📌 *dining chair 4, fan 3, mirror 2*\n\n` +
+    `_Ek hi message mein sab likho — bot samajh jaayega!_ 👇`,
+    [
+      { id: 'PRICE_CARD_AGAIN', title: '💰 Price List Phir Dekho' },
+      { id: 'MENU_EXPERT',      title: '💬 Expert Se Puchho' },
+    ],
     phoneNumberId, token
   );
 };
@@ -1017,6 +1022,34 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
     // ── Master Quick Order (all services, text input) ─────────────────────────
     case 'AWAITING_QUICK_ORDER': {
+      // Custom / Other request detection
+      if (/\bcustom\b|\bother\b|\bkuch aur\b|\bspecial\b|\bkuch alag\b|\bquote\b|\bestimate\b/.test(lowerText)) {
+        let leadId = conv.data.leadId;
+        if (!leadId) {
+          const partial = await Lead.create({
+            name: 'Incomplete', phone: from, serviceInterest: 'Other / Custom',
+            source: 'whatsapp', stage: 'new',
+            notes: 'WhatsApp bot — custom request',
+          });
+          leadId = partial._id.toString();
+        }
+        await save(conv, 'AWAITING_CUSTOM_REQUEST', { service: 'Other / Custom', leadId });
+        await sendText(from,
+          `💬 *Apni Requirement Batayein* 📝\n\n` +
+          `Detail mein likhein:\n` +
+          `_Jaise: "3 sofas + 2 carpets clean karwane hain" ya "full home deep clean"_\n\n` +
+          `Hum aapke liye best quote prepare karenge! ✨`,
+          phoneNumberId, token
+        );
+        break;
+      }
+
+      // Price card again button
+      if (text === 'PRICE_CARD_AGAIN') {
+        await sendMasterPriceCard(from, phoneNumberId, token);
+        break;
+      }
+
       const newItems = parseMasterOrder(text);
       if (newItems.length === 0) {
         await sendText(from,
@@ -1025,7 +1058,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           `"sofa 3, ottoman 2, cushion 3, table 2"\n` +
           `"single bed 2, dining chair 4, fan 3"\n` +
           `"sofa 3, single bed 2, ottoman 2, bathroom"\n\n` +
-          `_Ya "menu" type karein wapas jaane ke liye._`,
+          `_Koi special requirement? "custom" type karein._`,
           phoneNumberId, token
         );
         await sendMasterPriceCard(from, phoneNumberId, token);

@@ -262,25 +262,13 @@ const sendWelcome = async (to, biz, phoneNumberId, token, isReturning = false) =
     phoneNumberId, token
   );
 
-  await sendList(to,
-    `Aaj hum aapki kya help kar sakte hain? 👇`,
-    `Menu Kholein`,
+  await sendButtons(to,
+    `Aaj hum aapki kya help kar sakte hain? 👇\n\n` +
+    `_Neeche se option chunein:_`,
     [
-      {
-        title: '🏠 Cleaning Services',
-        rows: [
-          { id: 'MENU_BOOK',   title: '🧹 Book Cleaning',  description: 'Service schedule karein' },
-        //  { id: 'MENU_PRICE',  title: '💰 Price List',      description: 'Sabhi services ke rates' },
-         // { id: 'MENU_OFFERS', title: '🎁 Today\'s Offers', description: 'Special discounts aaj' },
-        ],
-      },
-      {
-        title: '🤝 Help & Support',
-        rows: [
-          { id: 'MENU_EXPERT',   title: '💬 Talk to Expert',    description: 'Team se seedha baat karo' },
-          { id: 'MENU_EXISTING', title: '📦 Existing Booking',  description: 'Track ya manage karein' },
-        ],
-      },
+      { id: 'MENU_BOOK',     title: '🧹 Book Cleaning' },
+      { id: 'MENU_EXPERT',   title: '💬 Talk to Expert' },
+      { id: 'MENU_EXISTING', title: '📦 Existing Booking' },
     ],
     phoneNumberId, token
   );

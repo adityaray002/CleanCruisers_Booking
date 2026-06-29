@@ -540,7 +540,7 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
   // Message 2 — ordering prompt (last message = always visible at bottom of chat)
   await sendText(to,
     `✍️ *Apna poora order ek saath type karein!*\n\n` +
-    `📌 _Quantity saath mein likho, comma se alag karo_\n\n` +
+    `📌 _Quantity saath mein likho, comma se alag karo_\n\n`
     `*Examples:*\n` +
     `▸ _sofa 3, ottoman 2, cushion 3, table 2_\n` 
     `_Ek hi message mein sab likho — bot sab samajh jaayega_ 👇`,

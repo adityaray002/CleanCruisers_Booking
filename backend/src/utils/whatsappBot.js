@@ -432,32 +432,74 @@ const parseMasterOrder = (rawText) => {
 };
 
 const sendMasterPriceCard = async (to, phoneNumberId, token) => {
+  // Message 1 — detailed price list with service descriptions
   await sendText(to,
-    `🧹 *SOFASHINE — COMPLETE PRICE MENU*\n\n` +
-    `🛋️ *SOFA CLEANING:*\n` +
-    `sofa 2=₹220  ·  sofa 3=₹330  ·  sofa 4=₹440\n` +
-    `sofa 5=₹520  ·  sofa 6=₹600  ·  sofa 7=₹700\n` +
-    `sofa 8=₹800  ·  sofa 9=₹900\n\n` +
-    `*Sofa Cum Bed:*\n` +
-    `scb 1=₹300  ·  scb 2=₹450  ·  scb 3=₹650  ·  scb 4=₹850\n\n` +
-    `*Sofa Extras:*\n` +
-    `ottoman=₹80/piece  ·  table=₹150/piece  ·  cushion=₹20/cover\n\n` +
-    `🛏️ *BED CLEANING:*\n` +
-    `single bed=₹299  ·  double bed=₹550\n\n` +
-    `🚿 *BATHROOM:* ₹350/bathroom\n\n` +
-    `🪑 *CHAIRS & ITEMS:*\n` +
-    `dining chair=₹80  ·  study chair=₹150\n` +
-    `fan=₹75  ·  mirror=₹50\n\n` +
-    `🐜 *PEST CONTROL:*\n` +
-    `cockroach=₹499  ·  ant=₹349  ·  full pest=₹799\n\n` +
+    `🧹 *SofaShine — Complete Price Menu* ✨\n` +
+    `_💳 Pay sirf kaam ke baad · 🌿 Eco-friendly · ✅ Trained staff_\n\n` +
+
     `━━━━━━━━━━━━━━━━━━\n` +
-    `✍️ *Apna poora order ek saath type karein!*\n` +
-    `_(Comma se alag karein, quantity saath mein likhein)_\n\n` +
+    `🛋️ *SOFA CLEANING*\n` +
+    `_Steam + daag hatao + deodorise · 2-4 hrs mein dry_\n` +
+    `• sofa 2 seat  →  ₹220\n` +
+    `• sofa 3 seat  →  ₹330\n` +
+    `• sofa 4 seat  →  ₹440\n` +
+    `• sofa 5 seat  →  ₹520\n` +
+    `• sofa 6 seat  →  ₹600\n` +
+    `• sofa 7 seat  →  ₹700\n` +
+    `• sofa 8 seat  →  ₹800\n` +
+    `• sofa 9 seat  →  ₹900\n\n` +
+
+    `🛋️ *SOFA CUM BED*\n` +
+    `_Full sofa + bed clean · fresh & odour-free_\n` +
+    `• scb 1 seat  →  ₹300\n` +
+    `• scb 2 seat  →  ₹450\n` +
+    `• scb 3 seat  →  ₹650\n` +
+    `• scb 4 seat  →  ₹850\n\n` +
+
+    `🪑 *SOFA EXTRAS*\n` +
+    `_Cushions, table, accessories ki cleaning_\n` +
+    `• ottoman  →  ₹80 / piece\n` +
+    `• table    →  ₹150 / table\n` +
+    `• cushion  →  ₹20 / cover\n\n` +
+
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🛏️ *BED CLEANING*\n` +
+    `_UV sanitize + steam + mite removal · safe & fresh_\n` +
+    `• single bed  →  ₹299\n` +
+    `• double bed  →  ₹550\n\n` +
+
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🚿 *BATHROOM CLEANING*\n` +
+    `_Tiles + grout + fixtures + complete sanitize_\n` +
+    `• per bathroom  →  ₹350\n\n` +
+
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🪑 *CHAIRS & ITEMS*\n` +
+    `_Fabric clean + deodorise + quick dry_\n` +
+    `• dining chair  →  ₹80 / chair\n` +
+    `• study chair   →  ₹150 / chair\n` +
+    `• fan           →  ₹75 / fan\n` +
+    `• mirror        →  ₹50 / mirror\n\n` +
+
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🐜 *PEST CONTROL*\n` +
+    `_Safe chemicals · long-lasting · 3 month warranty_\n` +
+    `• cockroach control  →  ₹499\n` +
+    `• ant treatment      →  ₹349\n` +
+    `• full pest control  →  ₹799`,
+    phoneNumberId, token
+  );
+
+  // Message 2 — ordering prompt (last message = always visible at bottom of chat)
+  await sendText(to,
+    `✍️ *Apna poora order ek saath type karein!*\n\n` +
+    `📌 _Quantity saath mein likho, comma se alag karo_\n\n` +
     `*Examples:*\n` +
-    `_"sofa 3, ottoman 2, cushion 3, table 2"_\n` +
-    `_"single bed 2, double bed 1, bathroom 2"_\n` +
-    `_"dining chair 4, fan 3, mirror 2"_\n` +
-    `_"sofa 3, single bed 2, ottoman 2, dining chair 4"_`,
+    `▸ _sofa 3, ottoman 2, cushion 3, table 2_\n` +
+    `▸ _single bed 2, dining chair 4, fan 3_\n` +
+    `▸ _sofa 4, scb 2, ottoman 2, single bed 1_\n` +
+    `▸ _bathroom 2, sofa 3, dining chair 6, table 1_\n\n` +
+    `_Ek hi message mein sab likho — bot sab samajh jaayega_ 👇`,
     phoneNumberId, token
   );
 };

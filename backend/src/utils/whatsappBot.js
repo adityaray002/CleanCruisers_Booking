@@ -305,28 +305,34 @@ const askService = async (to, biz, phoneNumberId, token) => {
   );
 };
 
-// ── Sofa Quick-Order (multi-select, text-based) ───────────────────────────────
+// ── Master Quick-Order (all services, text-based, one message) ────────────────
 
 const SOFA_PRICES    = { 2: 220, 3: 330, 4: 440, 5: 520, 6: 600, 7: 700, 8: 800, 9: 900 };
 const CUM_BED_PRICES = { 1: 300, 2: 450, 3: 650, 4: 850 };
 
-const parseQuickOrder = (rawText) => {
+// Last number in segment = quantity; for sofas, first number = seat count
+const getQty = (seg) => {
+  const nums = seg.match(/\d+/g);
+  return nums ? Math.max(1, parseInt(nums[nums.length - 1])) : 1;
+};
+
+const parseMasterOrder = (rawText) => {
   const segments = rawText.toLowerCase().split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
   const items = [];
 
   for (const seg of segments) {
-    // 1. Sofa Cum Bed (check before regular sofa — has "sofa" in name)
+    // 1. Sofa Cum Bed — number = seat count (check BEFORE regular sofa)
     if (/sofa\s*cum\s*bed|cum\s*bed|\bscb\b/.test(seg)) {
-      const n = parseInt(seg.match(/(\d+)/)?.[1]);
+      const n = parseInt(seg.match(/\d+/)?.[0]);
       if (n && CUM_BED_PRICES[n]) {
         items.push({ service: 'Sofa Cleaning', subService: `Sofa Cum Bed — ${n} Seat`, price: CUM_BED_PRICES[n], quantity: 1, unitPrice: CUM_BED_PRICES[n] });
       }
       continue;
     }
 
-    // 2. Regular sofa — number = seat count
-    if (/sofa|seater|seat/.test(seg)) {
-      const n = parseInt(seg.match(/(\d+)/)?.[1]);
+    // 2. Regular Sofa — number = seat count (NOT quantity)
+    if (/\bsofa\b|\bseater\b/.test(seg)) {
+      const n = parseInt(seg.match(/\d+/)?.[0]);
       if (n && SOFA_PRICES[n]) {
         items.push({ service: 'Sofa Cleaning', subService: `Sofa — ${n} Seats`, price: SOFA_PRICES[n], quantity: 1, unitPrice: SOFA_PRICES[n] });
         continue;
@@ -335,21 +341,89 @@ const parseQuickOrder = (rawText) => {
 
     // 3. Ottoman / Puffy — number = quantity
     if (/ottoman|puffy|\bott\b/.test(seg)) {
-      const qty = Math.max(1, parseInt(seg.match(/(\d+)/)?.[1]) || 1);
+      const qty = getQty(seg);
       items.push({ service: 'Sofa Cleaning', subService: 'Ottoman / Puffy', price: 80 * qty, quantity: qty, unitPrice: 80 });
       continue;
     }
 
-    // 4. Central Table
-    if (/table/.test(seg)) {
-      items.push({ service: 'Sofa Cleaning', subService: 'Central Table', price: 150, quantity: 1, unitPrice: 150 });
+    // 4. Central Table — number = quantity
+    if (/\btable\b/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Sofa Cleaning', subService: 'Central Table', price: 150 * qty, quantity: qty, unitPrice: 150 });
       continue;
     }
 
     // 5. Cushion Cover — number = quantity
     if (/cushion|cush/.test(seg)) {
-      const qty = Math.max(1, parseInt(seg.match(/(\d+)/)?.[1]) || 1);
+      const qty = getQty(seg);
       items.push({ service: 'Sofa Cleaning', subService: 'Cushion Cover', price: 20 * qty, quantity: qty, unitPrice: 20 });
+      continue;
+    }
+
+    // 6. Double Bed — check before "single" to avoid partial match
+    if (/double\s*bed|\bdouble\b/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Bed Cleaning', subService: 'Double Bed', price: 550 * qty, quantity: qty, unitPrice: 550 });
+      continue;
+    }
+
+    // 7. Single Bed
+    if (/single\s*bed|\bsingle\b/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Bed Cleaning', subService: 'Single Bed', price: 299 * qty, quantity: qty, unitPrice: 299 });
+      continue;
+    }
+
+    // 8. Bathroom / Washroom — number = quantity (e.g. "bathroom 2" = 2 bathrooms)
+    if (/bathroom|washroom|toilet/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Bathroom Cleaning', subService: 'Bathroom Deep Clean', price: 350 * qty, quantity: qty, unitPrice: 350 });
+      continue;
+    }
+
+    // 9. Study Chair (check before "dining" to avoid partial matches)
+    if (/study\s*chair|\bstudy\b|office\s*chair/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Chairs & Items', subService: 'Study Chair', price: 150 * qty, quantity: qty, unitPrice: 150 });
+      continue;
+    }
+
+    // 10. Dining Chair
+    if (/dining\s*chair|\bdining\b/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Chairs & Items', subService: 'Dining Chair', price: 80 * qty, quantity: qty, unitPrice: 80 });
+      continue;
+    }
+
+    // 11. Fan
+    if (/\bfan\b/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Chairs & Items', subService: 'Fan Cleaning', price: 75 * qty, quantity: qty, unitPrice: 75 });
+      continue;
+    }
+
+    // 12. Mirror
+    if (/mirror|aaina/.test(seg)) {
+      const qty = getQty(seg);
+      items.push({ service: 'Chairs & Items', subService: 'Mirror Cleaning', price: 50 * qty, quantity: qty, unitPrice: 50 });
+      continue;
+    }
+
+    // 13. Pest Control — Cockroach
+    if (/cockroach|keeday/.test(seg)) {
+      items.push({ service: 'Pest Control', subService: 'Cockroach Control', price: 499, quantity: 1, unitPrice: 499 });
+      continue;
+    }
+
+    // 14. Pest Control — Ant
+    if (/\bant\b|chinti/.test(seg)) {
+      items.push({ service: 'Pest Control', subService: 'Ant Treatment', price: 349, quantity: 1, unitPrice: 349 });
+      continue;
+    }
+
+    // 15. Full Pest Control
+    if (/full\s*pest|pest\s*control/.test(seg)) {
+      items.push({ service: 'Pest Control', subService: 'Full Pest Control', price: 799, quantity: 1, unitPrice: 799 });
       continue;
     }
   }
@@ -357,25 +431,33 @@ const parseQuickOrder = (rawText) => {
   return items;
 };
 
-const sendSofaPriceCard = async (to, phoneNumberId, token) => {
+const sendMasterPriceCard = async (to, phoneNumberId, token) => {
   await sendText(to,
-    `🛋️ *SOFA CLEANING — PRICE MENU*\n\n` +
-    `*Regular Sofa:*\n` +
-    `2 seat → ₹220   |   3 seat → ₹330\n` +
-    `4 seat → ₹440   |   5 seat → ₹520\n` +
-    `6 seat → ₹600   |   7 seat → ₹700\n` +
-    `8 seat → ₹800   |   9 seat → ₹900\n\n` +
+    `🧹 *SOFASHINE — COMPLETE PRICE MENU*\n\n` +
+    `🛋️ *SOFA CLEANING:*\n` +
+    `sofa 2=₹220  ·  sofa 3=₹330  ·  sofa 4=₹440\n` +
+    `sofa 5=₹520  ·  sofa 6=₹600  ·  sofa 7=₹700\n` +
+    `sofa 8=₹800  ·  sofa 9=₹900\n\n` +
     `*Sofa Cum Bed:*\n` +
-    `1 seat → ₹300   |   2 seat → ₹450\n` +
-    `3 seat → ₹650   |   4 seat → ₹850\n\n` +
+    `scb 1=₹300  ·  scb 2=₹450  ·  scb 3=₹650  ·  scb 4=₹850\n\n` +
     `*Sofa Extras:*\n` +
-    `🛏️ Ottoman/Puffy → ₹80/piece\n` +
-    `🪵 Central Table → ₹150\n` +
-    `🛋️ Cushion Cover → ₹20/cover\n\n` +
-    `✍️ *Apna poora order ek saath type karein:*\n` +
-    `_Example: "sofa 3, ottoman 2, cushion 3, table"_\n` +
-    `_Ya: "sofa cum bed 2, ottoman 1, cushion 4"_\n\n` +
-    `_(Har item comma se alag karein, quantity saath mein likhein)_`,
+    `ottoman=₹80/piece  ·  table=₹150/piece  ·  cushion=₹20/cover\n\n` +
+    `🛏️ *BED CLEANING:*\n` +
+    `single bed=₹299  ·  double bed=₹550\n\n` +
+    `🚿 *BATHROOM:* ₹350/bathroom\n\n` +
+    `🪑 *CHAIRS & ITEMS:*\n` +
+    `dining chair=₹80  ·  study chair=₹150\n` +
+    `fan=₹75  ·  mirror=₹50\n\n` +
+    `🐜 *PEST CONTROL:*\n` +
+    `cockroach=₹499  ·  ant=₹349  ·  full pest=₹799\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `✍️ *Apna poora order ek saath type karein!*\n` +
+    `_(Comma se alag karein, quantity saath mein likhein)_\n\n` +
+    `*Examples:*\n` +
+    `_"sofa 3, ottoman 2, cushion 3, table 2"_\n` +
+    `_"single bed 2, double bed 1, bathroom 2"_\n` +
+    `_"dining chair 4, fan 3, mirror 2"_\n` +
+    `_"sofa 3, single bed 2, ottoman 2, dining chair 4"_`,
     phoneNumberId, token
   );
 };
@@ -653,8 +735,13 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
   // Book button from return-to-menu shortcut
   if (text === 'MENU_BOOK' && conv.step !== 'AWAITING_MAIN_MENU') {
-    await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
-    await askService(from, biz, phoneNumberId, token);
+    if (biz.id === 'sofashine') {
+      await save(conv, 'AWAITING_QUICK_ORDER', { selectedServices: [] });
+      await sendMasterPriceCard(from, phoneNumberId, token);
+    } else {
+      await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
+      await askService(from, biz, phoneNumberId, token);
+    }
     return;
   }
 
@@ -682,8 +769,13 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
     case 'AWAITING_MAIN_MENU': {
       switch (text) {
         case 'MENU_BOOK':
-          await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
-          await askService(from, biz, phoneNumberId, token);
+          if (biz.id === 'sofashine') {
+            await save(conv, 'AWAITING_QUICK_ORDER', { selectedServices: [] });
+            await sendMasterPriceCard(from, phoneNumberId, token);
+          } else {
+            await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
+            await askService(from, biz, phoneNumberId, token);
+          }
           break;
         case 'MENU_PRICE':
           await sendPriceList(from, biz, phoneNumberId, token);
@@ -816,10 +908,10 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         break;
       }
 
-      // Sofa Cleaning → text-based multi-select (bypass WhatsApp list)
+      // Sofa Cleaning → master quick order (bypass WhatsApp list)
       if (match.id === 'Sofa Cleaning') {
         await save(conv, 'AWAITING_QUICK_ORDER', { service: match.id, leadId });
-        await sendSofaPriceCard(from, phoneNumberId, token);
+        await sendMasterPriceCard(from, phoneNumberId, token);
         break;
       }
 
@@ -857,26 +949,40 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
       break;
     }
 
-    // ── Sofa Quick Order (multi-select, text input) ───────────────────────────
+    // ── Master Quick Order (all services, text input) ─────────────────────────
     case 'AWAITING_QUICK_ORDER': {
-      const newItems = parseQuickOrder(text);
+      const newItems = parseMasterOrder(text);
       if (newItems.length === 0) {
         await sendText(from,
           `⚠️ Kuch samajh nahi aaya!\n\n` +
-          `*Aise type karein:*\n` +
-          `"sofa 3, ottoman 2, cushion 3"\n` +
-          `"sofa cum bed 2, table"\n` +
-          `"sofa 4, sofa cum bed 1, ottoman 3, cushion 5"\n\n` +
+          `*Aise type karein (comma se alag karein):*\n` +
+          `"sofa 3, ottoman 2, cushion 3, table 2"\n` +
+          `"single bed 2, dining chair 4, fan 3"\n` +
+          `"sofa 3, single bed 2, ottoman 2, bathroom"\n\n` +
           `_Ya "menu" type karein wapas jaane ke liye._`,
           phoneNumberId, token
         );
-        await sendSofaPriceCard(from, phoneNumberId, token);
+        await sendMasterPriceCard(from, phoneNumberId, token);
         break;
       }
+
+      // Create lead on first order (if not already created)
+      let leadId = conv.data.leadId;
+      if (!leadId) {
+        const services = [...new Set(newItems.map(i => i.service))].join(', ');
+        const partial  = await Lead.create({
+          name: 'Incomplete', phone: from, serviceInterest: services,
+          source: 'whatsapp', stage: 'new',
+          notes: 'WhatsApp bot — conversation in progress',
+        });
+        leadId = partial._id.toString();
+      }
+
       const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
       const cart = [...existing, ...newItems];
-      await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
-      await showCart(from, cart, 'Sofa Cleaning', phoneNumberId, token, existing.length === 0);
+      const lastService = newItems[newItems.length - 1]?.service || 'Sofa Cleaning';
+      await save(conv, 'AWAITING_ADD_MORE', { leadId, selectedServices: cart });
+      await showCart(from, cart, lastService, phoneNumberId, token, existing.length === 0);
       break;
     }
 
@@ -978,8 +1084,13 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
     // ── Add More / Continue ───────────────────────────────────────────────────
     case 'AWAITING_ADD_MORE': {
       if (text === 'ADD_MORE') {
-        await save(conv, 'AWAITING_SERVICE');
-        await askService(from, biz, phoneNumberId, token);
+        if (biz.id === 'sofashine') {
+          await save(conv, 'AWAITING_QUICK_ORDER');
+          await sendMasterPriceCard(from, phoneNumberId, token);
+        } else {
+          await save(conv, 'AWAITING_SERVICE');
+          await askService(from, biz, phoneNumberId, token);
+        }
         break;
       }
       if (text === 'CONTINUE') {

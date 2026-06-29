@@ -1213,6 +1213,18 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         await askDate(from, phoneNumberId, token);
         break;
       }
+      // SofaShine: try parsing as quick order addition directly from AWAITING_ADD_MORE
+      if (biz.id === 'sofashine') {
+        const newItems = parseMasterOrder(text);
+        if (newItems.length > 0) {
+          const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
+          const cart = [...existing, ...newItems];
+          const lastService = newItems[newItems.length - 1]?.service || conv.data.service;
+          await save(conv, 'AWAITING_ADD_MORE', { selectedServices: cart });
+          await showCart(from, cart, lastService, phoneNumberId, token, false);
+          break;
+        }
+      }
       // Unrecognised — re-show cart
       await showCart(from, conv.data.selectedServices || [], conv.data.service, phoneNumberId, token, false);
       break;

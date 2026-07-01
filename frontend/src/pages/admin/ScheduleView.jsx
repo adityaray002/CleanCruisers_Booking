@@ -5,12 +5,13 @@ import {
   Phone, MapPin, IndianRupee, User, Clock,
   PlayCircle, CheckCircle2, AlertTriangle, Timer,
   CalendarCheck, MessageSquare, Send, Smartphone,
+  Pencil, Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminLayout from '../../components/AdminLayout';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { bookingsAPI } from '../../utils/api';
-import { formatCurrency } from '../../utils/helpers';
+import { bookingsAPI, staffAPI } from '../../utils/api';
+import { formatCurrency, STATUS_CONFIG } from '../../utils/helpers';
 import { openWhatsApp, buildWorkerAssignmentMsg, buildWorkerDayScheduleMsg, buildWorkerPingMsg } from '../../utils/whatsapp';
 
 // Parse a slot string like "07:30 AM - 08:30 AM" → minutes since midnight for start or end
@@ -50,6 +51,42 @@ const formatTime = (date) => date
   ? new Date(date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
   : null;
 
+const to12h = (t) => {
+  if (!t) return '';
+  const [hStr, mStr] = t.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const period = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12; else if (h > 12) h -= 12;
+  return `${String(h).padStart(2, '0')}:${m} ${period}`;
+};
+const to24h = (t12) => {
+  if (!t12) return '';
+  const parts = t12.trim().split(' ');
+  const period = parts[1];
+  const [hStr, mStr] = parts[0].split(':');
+  let h = parseInt(hStr, 10);
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${mStr}`;
+};
+const SLOT_PRESETS = [
+  { label: '7–8 AM', start: '07:00', end: '08:00' },
+  { label: '8–9 AM', start: '08:00', end: '09:00' },
+  { label: '9–10 AM', start: '09:00', end: '10:00' },
+  { label: '10–11 AM', start: '10:00', end: '11:00' },
+  { label: '11–12 PM', start: '11:00', end: '12:00' },
+  { label: '12–1 PM', start: '12:00', end: '13:00' },
+  { label: '1–2 PM', start: '13:00', end: '14:00' },
+  { label: '2–3 PM', start: '14:00', end: '15:00' },
+  { label: '3–4 PM', start: '15:00', end: '16:00' },
+  { label: '4–5 PM', start: '16:00', end: '17:00' },
+  { label: '5–6 PM', start: '17:00', end: '18:00' },
+  { label: '6–7 PM', start: '18:00', end: '19:00' },
+  { label: '7–8 PM', start: '19:00', end: '20:00' },
+];
+const ALL_STATUSES = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'];
+
 export default function ScheduleView() {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()));
@@ -62,6 +99,15 @@ export default function ScheduleView() {
   const [pingModal, setPingModal] = useState(null); // { worker, booking? }
   const [pingMessage, setPingMessage] = useState('');
   const [sendAllModal, setSendAllModal] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState({ customerPhone: '', serviceLabel: '', totalAmount: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Full edit modal (triggered from card pencil button)
+  const [editModal, setEditModal] = useState(null);      // booking object
+  const [editModalData, setEditModalData] = useState({}); // form values
+  const [editModalStaff, setEditModalStaff] = useState([]);
+  const [editModalSaving, setEditModalSaving] = useState(false);
   const alertIntervalRef = useRef(null);
   const isToday = selectedDate === toDateStr(new Date());
 
@@ -194,6 +240,109 @@ export default function ScheduleView() {
       toast.error(err.response?.data?.message || 'Clock-out failed');
     } finally {
       setClockAction(null);
+    }
+  };
+
+  const openEditModal = async (booking) => {
+    const parts = booking.timeSlot?.split(' - ') || [];
+    setEditModalData({
+      status:             booking.status,
+      assignedStaff:      booking.assignedStaff?._id || '',
+      customerPhone:      booking.customerPhone || '',
+      serviceLabel:       booking.serviceLabel || '',
+      totalAmount:        String(booking.totalAmount ?? ''),
+      adminNotes:         booking.adminNotes || '',
+      workerNotes:        booking.workerNotes || '',
+      scheduledDate:      booking.scheduledDate ? booking.scheduledDate.split('T')[0] : '',
+      startTime:          parts[0] ? to24h(parts[0].trim()) : '',
+      endTime:            parts[1] ? to24h(parts[1].trim()) : '',
+      cancellationReason: booking.cancellationReason || '',
+    });
+    setEditModal(booking);
+    try {
+      const res = await staffAPI.getAll({ active: true });
+      setEditModalStaff(res.data.data);
+    } catch { /* silent — staff list optional */ }
+  };
+
+  const handleEditModalSave = async () => {
+    if (!editModal) return;
+    setEditModalSaving(true);
+    try {
+      const payload = {};
+      if (editModalData.status !== editModal.status)
+        payload.status = editModalData.status;
+      if (editModalData.assignedStaff !== (editModal.assignedStaff?._id || ''))
+        payload.assignedStaff = editModalData.assignedStaff || 'unassigned';
+      if (editModalData.customerPhone.trim() !== editModal.customerPhone)
+        payload.customerPhone = editModalData.customerPhone.trim();
+      if (editModalData.serviceLabel.trim() !== editModal.serviceLabel)
+        payload.serviceLabel = editModalData.serviceLabel.trim();
+      const newAmt = Number(editModalData.totalAmount);
+      if (!isNaN(newAmt) && newAmt !== editModal.totalAmount)
+        payload.totalAmount = newAmt;
+      if (editModalData.adminNotes !== (editModal.adminNotes || ''))
+        payload.adminNotes = editModalData.adminNotes;
+      if (editModalData.workerNotes !== (editModal.workerNotes || ''))
+        payload.workerNotes = editModalData.workerNotes;
+      if (editModalData.cancellationReason !== (editModal.cancellationReason || ''))
+        payload.cancellationReason = editModalData.cancellationReason;
+
+      const origDate = editModal.scheduledDate?.split('T')[0] || '';
+      const origSlot = editModal.timeSlot || '';
+      const newSlot  = editModalData.startTime && editModalData.endTime
+        ? `${to12h(editModalData.startTime)} - ${to12h(editModalData.endTime)}`
+        : origSlot;
+      if (editModalData.scheduledDate && editModalData.scheduledDate !== origDate)
+        payload.scheduledDate = new Date(editModalData.scheduledDate).toISOString();
+      if (newSlot !== origSlot) payload.timeSlot = newSlot;
+
+      if (Object.keys(payload).length === 0) { toast('No changes'); setEditModal(null); return; }
+
+      await bookingsAPI.update(editModal._id, payload);
+      toast.success('Booking updated');
+      setEditModal(null);
+      fetchSchedule();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Update failed');
+    } finally {
+      setEditModalSaving(false);
+    }
+  };
+
+  const openEditMode = (booking) => {
+    setEditData({
+      customerPhone: booking.customerPhone || '',
+      serviceLabel: booking.serviceLabel || '',
+      totalAmount: String(booking.totalAmount ?? ''),
+    });
+    setEditMode(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedBooking) return;
+    setSavingEdit(true);
+    try {
+      const payload = {};
+      if (editData.customerPhone.trim() !== selectedBooking.customerPhone)
+        payload.customerPhone = editData.customerPhone.trim();
+      if (editData.serviceLabel.trim() !== selectedBooking.serviceLabel)
+        payload.serviceLabel = editData.serviceLabel.trim();
+      const newAmount = Number(editData.totalAmount);
+      if (!isNaN(newAmount) && newAmount !== selectedBooking.totalAmount)
+        payload.totalAmount = newAmount;
+
+      if (Object.keys(payload).length === 0) { toast('No changes'); setEditMode(false); return; }
+
+      await bookingsAPI.update(selectedBooking._id, payload);
+      toast.success('Booking updated');
+      setSelectedBooking((b) => b ? { ...b, ...payload } : null);
+      setEditMode(false);
+      fetchSchedule();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Update failed');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -416,7 +565,7 @@ export default function ScheduleView() {
                           return (
                             <div key={s._id} className="p-1.5 min-h-[72px]">
                               {booking ? (
-                                <BookingCard booking={booking} onClick={() => setSelectedBooking(booking)} />
+                                <BookingCard booking={booking} onClick={() => { setSelectedBooking(booking); setEditMode(false); }} onEdit={openEditModal} />
                               ) : (
                                 <div
                                   className="h-full min-h-[60px] border-2 border-dashed border-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
@@ -430,7 +579,7 @@ export default function ScheduleView() {
                         })}
                         <div className="p-1.5 min-h-[72px] space-y-1">
                           {(grid[slot]?.unassigned || []).map((b) => (
-                            <BookingCard key={b._id} booking={b} onClick={() => setSelectedBooking(b)} />
+                            <BookingCard key={b._id} booking={b} onClick={() => { setSelectedBooking(b); setEditMode(false); }} onEdit={openEditModal} />
                           ))}
                           <div
                             className="border-2 border-dashed border-gray-100 rounded-lg flex items-center justify-center py-2 cursor-pointer hover:border-primary-200 hover:bg-primary-50/30 group"
@@ -451,7 +600,7 @@ export default function ScheduleView() {
 
       {/* ── Booking Detail Drawer ── */}
       {selectedBooking && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex justify-end" onClick={() => setSelectedBooking(null)}>
+        <div className="fixed inset-0 bg-black/40 z-40 flex justify-end" onClick={() => { setSelectedBooking(null); setEditMode(false); }}>
           <div
             className="w-full max-w-sm bg-white h-full overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -463,7 +612,7 @@ export default function ScheduleView() {
                   {selectedBooking.status.replace('_', ' ')}
                 </div>
               </div>
-              <button onClick={() => setSelectedBooking(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">✕</button>
+              <button onClick={() => { setSelectedBooking(null); setEditMode(false); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">✕</button>
             </div>
 
             <div className="p-5 space-y-4 text-sm">
@@ -512,6 +661,70 @@ export default function ScheduleView() {
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span>{selectedBooking.timeSlot}</span>
               </div>
+
+              {/* ── Edit Details (inline) ── */}
+              {selectedBooking.status !== 'cancelled' && (
+                <div>
+                  <button
+                    onClick={() => editMode ? setEditMode(false) : openEditMode(selectedBooking)}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 transition-all"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Pencil className="w-3.5 h-3.5 text-gray-400" /> Edit Details
+                    </span>
+                    <span className="text-xs text-gray-400">{editMode ? 'Cancel' : 'Phone · Service · Amount'}</span>
+                  </button>
+
+                  {editMode && (
+                    <div className="mt-2 space-y-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                      <div>
+                        <label className="text-xs text-gray-500 font-medium">Customer Phone</label>
+                        <input
+                          type="tel"
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none bg-white"
+                          value={editData.customerPhone}
+                          onChange={(e) => setEditData((d) => ({ ...d, customerPhone: e.target.value }))}
+                          maxLength={10}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 font-medium">Service / Description</label>
+                        <input
+                          type="text"
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none bg-white"
+                          value={editData.serviceLabel}
+                          onChange={(e) => setEditData((d) => ({ ...d, serviceLabel: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 font-medium">Amount (₹)</label>
+                        <input
+                          type="number"
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none bg-white"
+                          value={editData.totalAmount}
+                          onChange={(e) => setEditData((d) => ({ ...d, totalAmount: e.target.value }))}
+                          min={0}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditMode(false)}
+                          className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={savingEdit}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold disabled:opacity-60"
+                        >
+                          {savingEdit ? <LoadingSpinner size="sm" /> : <Check className="w-4 h-4" />} Save
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ── Actual timing tracker ── */}
               <div className={`rounded-xl p-4 space-y-3 border-2 ${
@@ -770,11 +983,202 @@ export default function ScheduleView() {
         </div>
       )}
 
+      {/* ── Full Edit Modal (triggered from card pencil) ── */}
+      {editModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <div>
+                <h3 className="font-semibold text-gray-900">Edit Booking</h3>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{editModal.bookingId}</p>
+              </div>
+              <button onClick={() => setEditModal(null)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">✕</button>
+            </div>
+
+            <div className="p-6 space-y-5">
+
+              {/* ── Customer details ── */}
+              <div className="border border-blue-200 rounded-xl p-4 space-y-3 bg-blue-50/30">
+                <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" /> Customer Details
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-gray-500 font-medium">Name</label>
+                    <div className="mt-1 px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700">{editModal.customerName}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium">Phone</label>
+                    <input
+                      type="tel"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none"
+                      value={editModalData.customerPhone || ''}
+                      onChange={(e) => setEditModalData((d) => ({ ...d, customerPhone: e.target.value }))}
+                      maxLength={10}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium">Amount (₹)</label>
+                    <input
+                      type="number"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none"
+                      value={editModalData.totalAmount || ''}
+                      onChange={(e) => setEditModalData((d) => ({ ...d, totalAmount: e.target.value }))}
+                      min={0}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-gray-500 font-medium">Service / Description</label>
+                    <input
+                      type="text"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none"
+                      value={editModalData.serviceLabel || ''}
+                      onChange={(e) => setEditModalData((d) => ({ ...d, serviceLabel: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Status ── */}
+              <div>
+                <label className="text-xs text-gray-500 font-medium block mb-1">Status</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none"
+                  value={editModalData.status || ''}
+                  onChange={(e) => setEditModalData((d) => ({ ...d, status: e.target.value }))}
+                >
+                  {ALL_STATUSES.map((s) => (
+                    <option key={s} value={s}>{STATUS_CONFIG[s]?.emoji} {STATUS_CONFIG[s]?.label || s}</option>
+                  ))}
+                </select>
+                {editModalData.status === 'cancelled' && (
+                  <input
+                    type="text"
+                    className="mt-2 w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                    placeholder="Cancellation reason..."
+                    value={editModalData.cancellationReason || ''}
+                    onChange={(e) => setEditModalData((d) => ({ ...d, cancellationReason: e.target.value }))}
+                  />
+                )}
+              </div>
+
+              {/* ── Assign Staff ── */}
+              <div>
+                <label className="text-xs text-gray-500 font-medium block mb-1">Assigned Worker</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none"
+                  value={editModalData.assignedStaff || ''}
+                  onChange={(e) => setEditModalData((d) => ({ ...d, assignedStaff: e.target.value }))}
+                >
+                  <option value="">— Unassigned —</option>
+                  {editModalStaff.map((s) => (
+                    <option key={s._id} value={s._id}>{s.name} · {s.phone} · ⭐{s.rating}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ── Reschedule ── */}
+              <div className="border border-amber-200 rounded-xl p-4 space-y-3 bg-amber-50/40">
+                <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" /> Reschedule
+                  <span className="font-normal text-amber-600 ml-1">
+                    — current: {editModal.scheduledDate?.split('T')[0]} · {editModal.timeSlot}
+                  </span>
+                </p>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">New Date</label>
+                  <input
+                    type="date"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none"
+                    value={editModalData.scheduledDate || ''}
+                    onChange={(e) => setEditModalData((d) => ({ ...d, scheduledDate: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium mb-1 block">New Time Slot</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {SLOT_PRESETS.map((p) => {
+                      const active = editModalData.startTime === p.start && editModalData.endTime === p.end;
+                      return (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() => setEditModalData((d) => ({ ...d, startTime: p.start, endTime: p.end }))}
+                          className={`px-2.5 py-1 text-xs rounded-lg border transition-all ${active ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400'}`}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input type="time" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-300"
+                        value={editModalData.startTime || ''} onChange={(e) => setEditModalData((d) => ({ ...d, startTime: e.target.value }))} />
+                      <p className="text-[10px] text-gray-400 mt-0.5 pl-1">Start</p>
+                    </div>
+                    <span className="text-gray-400 text-sm self-center pb-4">→</span>
+                    <div className="flex-1">
+                      <input type="time" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-300"
+                        value={editModalData.endTime || ''} onChange={(e) => setEditModalData((d) => ({ ...d, endTime: e.target.value }))} />
+                      <p className="text-[10px] text-gray-400 mt-0.5 pl-1">End</p>
+                    </div>
+                  </div>
+                  {editModalData.startTime && editModalData.endTime && (
+                    <p className="text-xs text-primary-600 font-medium mt-1.5">
+                      New slot: {to12h(editModalData.startTime)} – {to12h(editModalData.endTime)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Notes ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Worker Notes</label>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none resize-none"
+                    rows={3}
+                    placeholder="Instructions for the worker..."
+                    value={editModalData.workerNotes || ''}
+                    onChange={(e) => setEditModalData((d) => ({ ...d, workerNotes: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Admin Notes</label>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 outline-none resize-none"
+                    rows={3}
+                    placeholder="Internal notes..."
+                    value={editModalData.adminNotes || ''}
+                    onChange={(e) => setEditModalData((d) => ({ ...d, adminNotes: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* ── Buttons ── */}
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => setEditModal(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 font-medium">
+                  Cancel
+                </button>
+                <button onClick={handleEditModalSave} disabled={editModalSaving}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold disabled:opacity-60">
+                  {editModalSaving ? <LoadingSpinner size="sm" /> : <Check className="w-4 h-4" />} Save Changes
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </AdminLayout>
   );
 }
 
-function BookingCard({ booking, onClick }) {
+function BookingCard({ booking, onClick, onEdit }) {
   const srcBadge = SOURCE_BADGE[booking.source] || SOURCE_BADGE.admin;
   const isOvertime = booking.status === 'in_progress' && isRunningOvertime(booking.timeSlot);
   return (
@@ -788,7 +1192,17 @@ function BookingCard({ booking, onClick }) {
           <Timer className="w-2.5 h-2.5" /> LATE
         </div>
       )}
-      <div className="font-semibold truncate">{booking.customerName}</div>
+      {/* Edit button — visible on hover */}
+      {onEdit && booking.status !== 'cancelled' && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(booking); }}
+          className="absolute top-1 right-1 p-1 rounded bg-white/80 hover:bg-white shadow-sm text-gray-400 hover:text-primary-600 transition-all z-10"
+          title="Edit booking"
+        >
+          <Pencil className="w-3 h-3" />
+        </button>
+      )}
+      <div className="font-semibold truncate pr-5">{booking.customerName}</div>
       <div className="truncate opacity-80 mt-0.5">{booking.serviceLabel}</div>
       <div className="flex items-center justify-between mt-1 gap-1">
         <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${srcBadge.color}`}>{srcBadge.label}</span>
@@ -796,6 +1210,15 @@ function BookingCard({ booking, onClick }) {
           {booking.totalAmount === 0 ? 'TBD' : formatCurrency(booking.totalAmount)}
         </span>
       </div>
+      {booking.customerPhone && (
+        <a
+          href={`tel:${booking.customerPhone}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1 text-[10px] text-primary-600 mt-1 hover:underline w-fit"
+        >
+          <Phone className="w-2.5 h-2.5" /> Call
+        </a>
+      )}
       {booking.actualStartTime && booking.status === 'in_progress' && (
         <div className="text-[10px] text-purple-600 mt-0.5">▶ Started {formatTime(booking.actualStartTime)}</div>
       )}

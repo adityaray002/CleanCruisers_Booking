@@ -121,9 +121,11 @@ export default function WhatsAppInbox() {
   const [labelFilter, setLabelFilter]     = useState('all'); // 'all' | label key
   const [showNote, setShowNote]           = useState(false);
   const bottomRef                         = useRef(null);
+  const messagesContainerRef              = useRef(null);
   const listPollRef                       = useRef(null);
   const msgPollRef                        = useRef(null);
   const textareaRef                       = useRef(null);
+  const userScrolledUp                    = useRef(false);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -169,11 +171,20 @@ export default function WhatsAppInbox() {
     return () => clearInterval(msgPollRef.current);
   }, [selected, fetchMessages]);
 
+  const handleMessagesScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    userScrolledUp.current = el.scrollHeight - el.scrollTop - el.clientHeight > 80;
+  };
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!userScrolledUp.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const handleSelect = (c) => {
+    userScrolledUp.current = false;
     setSelected({ customerPhone: c.customerPhone, businessId: c.businessId });
     setMessages([]);
     setLead(null);
@@ -219,6 +230,7 @@ export default function WhatsAppInbox() {
             : c
         ));
       }
+      userScrolledUp.current = false;
       await fetchMessages(selected.customerPhone, selected.businessId, true);
     } catch {
       toast.error('Failed to send — customer must message first (24h window)');
@@ -435,7 +447,7 @@ export default function WhatsAppInbox() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: '#f0f2f5' }}>
+            <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: '#f0f2f5' }}>
               {loadingMsgs ? (
                 <div className="text-center text-gray-400 text-sm py-12">Loading messages...</div>
               ) : messages.length === 0 ? (

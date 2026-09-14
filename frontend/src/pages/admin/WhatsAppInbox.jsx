@@ -262,7 +262,7 @@ export default function WhatsAppInbox() {
       <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
 
         {/* ── Left: Conversation list ── */}
-        <div className={`w-full md:w-80 border-r border-gray-100 flex flex-col flex-shrink-0 ${selected ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`w-full md:w-80 border-r border-gray-100 flex flex-col flex-shrink-0 overflow-hidden ${selected ? 'hidden md:flex' : 'flex'}`}>
           {/* Header + label filter */}
           <div className="border-b border-gray-100">
             <div className="px-4 py-3 flex items-center gap-2">
@@ -358,7 +358,7 @@ export default function WhatsAppInbox() {
 
         {/* ── Right: Chat view ── */}
         {selected ? (
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Chat header */}
             <div className="px-4 py-3 border-b border-gray-100 bg-white">
               <div className="flex items-center gap-3">

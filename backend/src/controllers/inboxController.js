@@ -15,7 +15,6 @@ const getConversations = async (req, res) => {
         lastDirection: { $first: '$direction' },
       }},
       { $sort: { lastMessageAt: -1 } },
-      { $limit: 100 },
     ]);
 
     const enriched = await Promise.all(convos.map(async (c) => {

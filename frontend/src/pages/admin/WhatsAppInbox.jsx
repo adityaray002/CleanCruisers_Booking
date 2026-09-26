@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { MessageSquare, Send, Phone, RefreshCw, ChevronLeft, User, Tag, StickyNote, X } from 'lucide-react';
+import { MessageSquare, Send, Phone, RefreshCw, ChevronLeft, User, Tag, StickyNote, X, Download } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import { inboxAPI } from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -183,6 +183,45 @@ export default function WhatsAppInbox() {
     }
   }, [messages]);
 
+  const handleExportCSV = () => {
+    if (!conversations.length) { toast.error('No conversations to export'); return; }
+
+    const headers = [
+      'Phone', 'Name', 'Business', 'Label', 'Note',
+      'Lead Stage', 'Service Interest', 'Bot Step',
+      'Last Message', 'Last Direction', 'Last Message At',
+    ];
+
+    const escape = (val) => {
+      const s = String(val ?? '').replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const rows = conversations.map((c) => [
+      escape(c.customerPhone),
+      escape(c.lead?.name || ''),
+      escape(c.businessId),
+      escape(c.chatLabel || ''),
+      escape(c.chatNote || ''),
+      escape(c.lead?.stage || ''),
+      escape(c.lead?.serviceInterest || ''),
+      escape(c.botStep || ''),
+      escape(c.lastMessage || ''),
+      escape(c.lastDirection || ''),
+      escape(c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString('en-IN') : ''),
+    ]);
+
+    const csv = [headers.map((h) => `"${h}"`).join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `whatsapp-inbox-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${conversations.length} conversations`);
+  };
+
   const handleSelect = (c) => {
     userScrolledUp.current = false;
     setSelected({ customerPhone: c.customerPhone, businessId: c.businessId });
@@ -281,6 +320,9 @@ export default function WhatsAppInbox() {
               <MessageSquare className="w-4 h-4 text-green-600" />
               <span className="font-semibold text-sm text-gray-900">Conversations</span>
               <span className="ml-auto text-xs text-gray-400">{filteredConversations.length}</span>
+              <button onClick={handleExportCSV} title="Download Excel" className="text-gray-400 hover:text-green-600 p-1">
+                <Download className="w-3.5 h-3.5" />
+              </button>
               <button onClick={fetchConversations} className="text-gray-400 hover:text-gray-600 p-1">
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>

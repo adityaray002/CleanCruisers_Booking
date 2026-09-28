@@ -119,6 +119,7 @@ export default function WhatsAppInbox() {
   const [loading, setLoading]             = useState(true);
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
   const [labelFilter, setLabelFilter]     = useState('all'); // 'all' | label key
+  const [searchQuery, setSearchQuery]     = useState('');
   const [showNote, setShowNote]           = useState(false);
   const bottomRef                         = useRef(null);
   const messagesContainerRef              = useRef(null);
@@ -285,11 +286,20 @@ export default function WhatsAppInbox() {
 
   const displayName = (c) => c.lead?.name || c.customerPhone;
 
-  const filteredConversations = labelFilter === 'all'
-    ? conversations
-    : labelFilter === 'none'
-      ? conversations.filter((c) => !c.chatLabel)
-      : conversations.filter((c) => c.chatLabel === labelFilter);
+  const filteredConversations = conversations
+    .filter((c) => {
+      if (labelFilter === 'none') return !c.chatLabel;
+      if (labelFilter !== 'all') return c.chatLabel === labelFilter;
+      return true;
+    })
+    .filter((c) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.trim().toLowerCase();
+      return (
+        c.customerPhone.includes(q) ||
+        (c.lead?.name || '').toLowerCase().includes(q)
+      );
+    });
 
   return (
     <AdminLayout title="WhatsApp Inbox">
@@ -326,6 +336,16 @@ export default function WhatsAppInbox() {
               <button onClick={fetchConversations} className="text-gray-400 hover:text-gray-600 p-1">
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
+            </div>
+            {/* Search box */}
+            <div className="px-3 pb-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by number or name…"
+                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-300 bg-gray-50"
+              />
             </div>
             {/* Label filter tabs */}
             <div className="px-3 pb-2 flex flex-wrap gap-1">

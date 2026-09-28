@@ -394,11 +394,11 @@ export default function WhatsAppInbox() {
                           : c.chatLabel === 'closed'  ? 'bg-gray-100 text-gray-500'
                           : c.chatLabel === 'no_response' ? 'bg-red-100 text-red-600'
                           : 'bg-green-100 text-green-700'}`}>
-                        {displayName(c)[0]?.toUpperCase()}
+                        {c.customerPhone[0]}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1">
-                          <span className="font-medium text-sm text-gray-900 truncate">{displayName(c)}</span>
+                          <span className="font-medium text-sm text-gray-900 truncate">{c.customerPhone}</span>
                           <span className="ml-auto text-xs text-gray-400 shrink-0 pl-1">{fmtConvDate(c.lastMessageAt)}</span>
                         </div>
                         <p className="text-xs text-gray-500 truncate mt-0.5">

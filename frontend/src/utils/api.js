@@ -109,6 +109,7 @@ export const leadsAPI = {
 
 export const inboxAPI = {
   getAll:       (silent = false)                  => api.get('/inbox', { silent }),
+  getContacts:  ()                                => api.get('/inbox/contacts'),
   getMessages:  (phone, businessId, silent = false) => api.get(`/inbox/${phone}`, { params: { businessId }, silent }),
   updateLabel:  (phone, data)       => api.patch(`/inbox/${phone}/label`, data),
   sendReply:    (phone, data)       => api.post(`/inbox/${phone}/reply`, data),

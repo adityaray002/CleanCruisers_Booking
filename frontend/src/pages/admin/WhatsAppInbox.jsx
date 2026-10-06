@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { MessageSquare, Send, Phone, RefreshCw, ChevronLeft, User, Tag, StickyNote, X, Download } from 'lucide-react';
+import { MessageSquare, Send, Phone, RefreshCw, ChevronLeft, User, Tag, StickyNote, X, Download, Contact } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import { inboxAPI } from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -43,6 +43,7 @@ const fmtTime = (d) =>
   new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
 const fmtConvDate = (d) => {
+  if (!d) return '';
   const date  = new Date(d);
   const today = new Date();
   if (date.toDateString() === today.toDateString()) return fmtTime(d);
@@ -105,6 +106,126 @@ function NoteModal({ phone, businessId, currentNote, onClose, onSaved }) {
   );
 }
 
+// ── All-contacts export (WhatsApp + leads + bookings, de-duplicated) ──────────
+const downloadFile = (content, filename, type) => {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a   = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const fmtDay   = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '');
+const toIntl   = (phone) => (phone.length === 10 ? `+91${phone}` : `+${phone}`);
+const csvCell  = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+const vcfValue = (v) => String(v).replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\r?\n/g, ' ');
+
+const buildContactsCSV = (contacts) => {
+  const headers = ['Phone', 'Name', 'Booked', 'Service Interest', 'Sources', 'Business', 'First Seen', 'Last Seen'];
+  const rows = contacts.map((c) => [
+    c.phone, c.name, c.booked ? 'Yes' : 'No', c.serviceInterest,
+    c.sources.join(', '), c.businesses.join(', '), fmtDay(c.firstSeen), fmtDay(c.lastSeen),
+  ].map(csvCell).join(','));
+  return '\uFEFF' + [headers.map(csvCell).join(','), ...rows].join('\n');
+};
+
+const buildContactsVCF = (contacts) => contacts.map((c) => {
+  const name = vcfValue(c.name || `Customer ${c.phone}`);
+  return ['BEGIN:VCARD', 'VERSION:3.0', `N:;${name};;;`, `FN:${name}`, `TEL;TYPE=CELL:${toIntl(c.phone)}`, 'END:VCARD'].join('\r\n');
+}).join('\r\n');
+
+function ContactsExportModal({ onClose }) {
+  const [contacts, setContacts] = useState(null);
+  const [filter, setFilter]     = useState('all'); // 'all' | 'booked' | 'not_booked'
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Fetch once on open; the parent re-renders on every poll and would otherwise refetch
+  useEffect(() => {
+    inboxAPI.getContacts()
+      .then((res) => setContacts(res.data.data))
+      .catch(() => onCloseRef.current());
+  }, []);
+
+  const list = (contacts || []).filter((c) =>
+    filter === 'booked' ? c.booked : filter === 'not_booked' ? !c.booked : true
+  );
+  const bookedCount = (contacts || []).filter((c) => c.booked).length;
+  const stamp = new Date().toISOString().slice(0, 10);
+  const suffix = filter === 'all' ? '' : `-${filter.replace('_', '-')}`;
+
+  const exportCSV = () => {
+    downloadFile(buildContactsCSV(list), `customer-numbers${suffix}-${stamp}.csv`, 'text/csv;charset=utf-8;');
+    toast.success(`Exported ${list.length} contacts`);
+  };
+  const exportVCF = () => {
+    downloadFile(buildContactsVCF(list), `customer-numbers${suffix}-${stamp}.vcf`, 'text/vcard;charset=utf-8;');
+    toast.success(`Exported ${list.length} contacts`);
+  };
+
+  const filters = [
+    { key: 'all',        label: 'All',        count: contacts?.length ?? 0 },
+    { key: 'booked',     label: 'Booked',     count: bookedCount },
+    { key: 'not_booked', label: 'Not booked', count: (contacts?.length ?? 0) - bookedCount },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <span className="font-semibold text-gray-900 text-sm">Export All Customer Numbers</span>
+          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          {!contacts ? (
+            <p className="text-sm text-gray-400 text-center py-6">Loading contacts…</p>
+          ) : (
+            <>
+              <p className="text-xs text-gray-500">
+                Every number from WhatsApp chats, leads and bookings, with duplicates removed.
+              </p>
+              <div className="flex gap-1.5 flex-wrap">
+                {filters.map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilter(f.key)}
+                    className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                      filter === f.key ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={exportCSV}
+                  disabled={!list.length}
+                  className="text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-2 disabled:opacity-40"
+                >
+                  Excel (.csv)
+                </button>
+                <button
+                  onClick={exportVCF}
+                  disabled={!list.length}
+                  className="text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-2 disabled:opacity-40"
+                >
+                  Phone contacts (.vcf)
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">
+                Open the .vcf file on your phone to save all numbers to contacts at once.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function WhatsAppInbox() {
   const [conversations, setConversations] = useState([]);
@@ -121,6 +242,8 @@ export default function WhatsAppInbox() {
   const [labelFilter, setLabelFilter]     = useState('all'); // 'all' | label key
   const [searchQuery, setSearchQuery]     = useState('');
   const [showNote, setShowNote]           = useState(false);
+  const [showContactsExport, setShowContactsExport] = useState(false);
+  const [contact, setContact]             = useState(null);
   const bottomRef                         = useRef(null);
   const messagesContainerRef              = useRef(null);
   const listPollRef                       = useRef(null);
@@ -146,6 +269,7 @@ export default function WhatsAppInbox() {
       setMessages(res.data.data.messages);
       setLead(res.data.data.lead);
       setConv(res.data.data.conv);
+      setContact(res.data.data.contact);
       setChatLabel(res.data.data.chatLabel?.label || null);
       setChatNote(res.data.data.chatLabel?.note || '');
     } catch {
@@ -188,7 +312,7 @@ export default function WhatsAppInbox() {
     if (!conversations.length) { toast.error('No conversations to export'); return; }
 
     const headers = [
-      'Phone', 'Name', 'Business', 'Label', 'Note',
+      'Phone', 'Name', 'WhatsApp Name', 'Business', 'Label', 'Note',
       'Lead Stage', 'Service Interest', 'Bot Step',
       'Last Message', 'Last Direction', 'Last Message At',
     ];
@@ -201,6 +325,7 @@ export default function WhatsAppInbox() {
     const rows = conversations.map((c) => [
       escape(c.customerPhone),
       escape(c.lead?.name || ''),
+      escape(c.profileName || ''),
       escape(c.businessId),
       escape(c.chatLabel || ''),
       escape(c.chatNote || ''),
@@ -229,6 +354,7 @@ export default function WhatsAppInbox() {
     setMessages([]);
     setLead(null);
     setConv(null);
+    setContact(null);
     setChatLabel(c.chatLabel);
     setChatNote(c.chatNote);
   };
@@ -297,12 +423,14 @@ export default function WhatsAppInbox() {
       const q = searchQuery.trim().toLowerCase();
       return (
         c.customerPhone.includes(q) ||
-        (c.lead?.name || '').toLowerCase().includes(q)
+        (c.lead?.name || '').toLowerCase().includes(q) ||
+        (c.profileName || '').toLowerCase().includes(q)
       );
     });
 
   return (
     <AdminLayout title="WhatsApp Inbox">
+      {showContactsExport && <ContactsExportModal onClose={() => setShowContactsExport(false)} />}
       {showNote && selected && (
         <NoteModal
           phone={selected.customerPhone}
@@ -330,6 +458,9 @@ export default function WhatsAppInbox() {
               <MessageSquare className="w-4 h-4 text-green-600" />
               <span className="font-semibold text-sm text-gray-900">Conversations</span>
               <span className="ml-auto text-xs text-gray-400">{filteredConversations.length}</span>
+              <button onClick={() => setShowContactsExport(true)} title="Export all customer numbers" className="text-gray-400 hover:text-blue-600 p-1">
+                <Contact className="w-3.5 h-3.5" />
+              </button>
               <button onClick={handleExportCSV} title="Download Excel" className="text-gray-400 hover:text-green-600 p-1">
                 <Download className="w-3.5 h-3.5" />
               </button>
@@ -440,11 +571,11 @@ export default function WhatsAppInbox() {
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm shrink-0">
-                  {(lead?.name || selected.customerPhone)[0]?.toUpperCase()}
+                  {(lead?.name || contact?.profileName || selected.customerPhone)[0]?.toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-gray-900">
-                    {lead?.name || selected.customerPhone}
+                    {lead?.name || contact?.profileName || selected.customerPhone}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="flex items-center gap-1 text-xs text-gray-400">
@@ -514,8 +645,8 @@ export default function WhatsAppInbox() {
                 <div className="text-center text-gray-400 text-sm py-12">Loading messages...</div>
               ) : messages.length === 0 ? (
                 <div className="text-center text-gray-400 text-sm py-12">
-                  No messages stored yet.<br />
-                  <span className="text-xs">Messages appear here when customers message SofaShine.</span>
+                  No messages to show.<br />
+                  <span className="text-xs">Chats are deleted after 90 days. The customer's number and details are kept.</span>
                 </div>
               ) : (
                 messages.map((msg) => {

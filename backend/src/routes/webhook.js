@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Message = require('../models/Message');
+const WhatsAppContact = require('../models/WhatsAppContact');
 
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'cleancruisers_webhook_2024';
 
@@ -75,6 +76,15 @@ router.post('/', (req, res) => {
     msgType,
     waMessageId:   message.id,
   }).catch(() => {});
+
+  const profileName = value.contacts?.[0]?.profile?.name?.trim();
+  if (profileName) {
+    WhatsAppContact.updateOne(
+      { customerPhone: from, businessId: getBizId(businessPhone) },
+      { $set: { profileName } },
+      { upsert: true }
+    ).catch((err) => console.error('[CONTACT] Failed to save profile name:', err.message));
+  }
 
   // Hand off to bot handler (async — don't block the 200 response)
   const { handleIncoming } = require('../utils/whatsappBot');

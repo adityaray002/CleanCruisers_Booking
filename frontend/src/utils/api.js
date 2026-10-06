@@ -31,7 +31,7 @@ api.interceptors.response.use(
 
     // Don't show toast for 401 on /auth/me (silent check)
     const isAuthCheck = error.config?.url?.includes('/auth/me');
-    if (!isAuthCheck) {
+    if (!isAuthCheck && !error.config?.silent) {
       toast.error(message);
     }
 
@@ -108,8 +108,8 @@ export const leadsAPI = {
 };
 
 export const inboxAPI = {
-  getAll:       ()                  => api.get('/inbox'),
-  getMessages:  (phone, businessId) => api.get(`/inbox/${phone}`, { params: { businessId } }),
+  getAll:       (silent = false)                  => api.get('/inbox', { silent }),
+  getMessages:  (phone, businessId, silent = false) => api.get(`/inbox/${phone}`, { params: { businessId }, silent }),
   updateLabel:  (phone, data)       => api.patch(`/inbox/${phone}/label`, data),
   sendReply:    (phone, data)       => api.post(`/inbox/${phone}/reply`, data),
 };

@@ -17,14 +17,26 @@ const getConversations = async (req, res) => {
       { $sort: { lastMessageAt: -1 } },
     ]);
 
-    const enriched = await Promise.all(convos.map(async (c) => {
+    const phones = [...new Set(convos.map((c) => c._id.customerPhone))];
+    const [leads, convDocs, labels] = await Promise.all([
+      Lead.find({ phone: { $in: phones } }).sort({ createdAt: -1 }).select('phone name stage serviceInterest convertedBookingId').lean(),
+      Conversation.find({ customerPhone: { $in: phones } }).select('customerPhone businessId step').lean(),
+      ChatLabel.find({ customerPhone: { $in: phones } }).lean(),
+    ]);
+
+    // Sorted newest-first, so the first lead seen per phone is the latest one
+    const leadByPhone = new Map();
+    for (const l of leads) if (!leadByPhone.has(l.phone)) leadByPhone.set(l.phone, l);
+    const key = (phone, bizId) => `${phone}:${bizId}`;
+    const convByKey  = new Map(convDocs.map((d) => [key(d.customerPhone, d.businessId), d]));
+    const labelByKey = new Map(labels.map((d) => [key(d.customerPhone, d.businessId), d]));
+
+    const enriched = convos.map((c) => {
       const phone = c._id.customerPhone;
       const bizId = c._id.businessId;
-      const [lead, conv, chatLabel] = await Promise.all([
-        Lead.findOne({ phone }).sort({ createdAt: -1 }).select('name stage serviceInterest convertedBookingId').lean(),
-        Conversation.findOne({ customerPhone: phone, businessId: bizId }).select('step').lean(),
-        ChatLabel.findOne({ customerPhone: phone, businessId: bizId }).lean(),
-      ]);
+      const lead      = leadByPhone.get(phone) || null;
+      const conv      = convByKey.get(key(phone, bizId));
+      const chatLabel = labelByKey.get(key(phone, bizId));
       return {
         customerPhone: phone,
         businessId:    bizId,
@@ -36,7 +48,7 @@ const getConversations = async (req, res) => {
         chatLabel: chatLabel?.label  || null,
         chatNote:  chatLabel?.note   || '',
       };
-    }));
+    });
 
     res.json({ success: true, data: enriched });
   } catch (err) {

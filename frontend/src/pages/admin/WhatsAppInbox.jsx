@@ -128,9 +128,9 @@ export default function WhatsAppInbox() {
   const textareaRef                       = useRef(null);
   const userScrolledUp                    = useRef(false);
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (silent = false) => {
     try {
-      const res = await inboxAPI.getAll();
+      const res = await inboxAPI.getAll(silent);
       setConversations(res.data.data);
     } catch {
       // silent background poll
@@ -142,7 +142,7 @@ export default function WhatsAppInbox() {
   const fetchMessages = useCallback(async (phone, bizId, silent = false) => {
     if (!silent) setLoadingMsgs(true);
     try {
-      const res = await inboxAPI.getMessages(phone, bizId);
+      const res = await inboxAPI.getMessages(phone, bizId, silent);
       setMessages(res.data.data.messages);
       setLead(res.data.data.lead);
       setConv(res.data.data.conv);
@@ -157,7 +157,7 @@ export default function WhatsAppInbox() {
 
   useEffect(() => {
     fetchConversations();
-    listPollRef.current = setInterval(fetchConversations, 8000);
+    listPollRef.current = setInterval(() => fetchConversations(true), 8000);
     return () => clearInterval(listPollRef.current);
   }, [fetchConversations]);
 
@@ -333,7 +333,7 @@ export default function WhatsAppInbox() {
               <button onClick={handleExportCSV} title="Download Excel" className="text-gray-400 hover:text-green-600 p-1">
                 <Download className="w-3.5 h-3.5" />
               </button>
-              <button onClick={fetchConversations} className="text-gray-400 hover:text-gray-600 p-1">
+              <button onClick={() => fetchConversations()} className="text-gray-400 hover:text-gray-600 p-1">
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
             </div>

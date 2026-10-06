@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 
 const connectDB = require('./src/config/database');
 const errorHandler = require('./src/middleware/errorHandler');
@@ -56,6 +57,12 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   message: { success: false, message: 'Too many requests, please try again later.' },
+  // Logged-in admins are exempt; the admin panel polls (inbox) and would exhaust 100/15min.
+  skip: (req) => {
+    const token = req.headers.authorization?.startsWith('Bearer') && req.headers.authorization.split(' ')[1];
+    if (!token) return false;
+    try { jwt.verify(token, process.env.JWT_SECRET); return true; } catch { return false; }
+  },
 });
 app.use(/^\/api\/(?!webhook).*/, limiter);
 

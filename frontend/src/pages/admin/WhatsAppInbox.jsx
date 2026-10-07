@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { MessageSquare, Send, Phone, RefreshCw, ChevronLeft, User, Tag, StickyNote, X, Download, Contact } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import { inboxAPI } from '../../utils/api';
+import { downloadCallingSheet } from '../../utils/callingSheet';
 import toast from 'react-hot-toast';
 
 // ── Label config ──────────────────────────────────────────────────────────────
@@ -41,6 +42,14 @@ const STEP_LABEL = {
 
 const fmtTime = (d) =>
   new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+// Local-date 'YYYY-MM-DD', same format as <input type="date">
+const toYMD = (d) => {
+  const date = new Date(d);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+const daysAgoYMD = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return toYMD(d); };
 
 const fmtConvDate = (d) => {
   if (!d) return '';
@@ -241,6 +250,9 @@ export default function WhatsAppInbox() {
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
   const [labelFilter, setLabelFilter]     = useState('all'); // 'all' | label key
   const [searchQuery, setSearchQuery]     = useState('');
+  const [dateFrom, setDateFrom]           = useState(''); // 'YYYY-MM-DD', filters on last message date
+  const [dateTo, setDateTo]               = useState('');
+  const [exporting, setExporting]         = useState(false);
   const [showNote, setShowNote]           = useState(false);
   const [showContactsExport, setShowContactsExport] = useState(false);
   const [contact, setContact]             = useState(null);
@@ -308,44 +320,39 @@ export default function WhatsAppInbox() {
     }
   }, [messages]);
 
-  const handleExportCSV = () => {
-    if (!conversations.length) { toast.error('No conversations to export'); return; }
+  // Exports exactly what the list shows (date + label + search filters applied)
+  const handleExportExcel = async () => {
+    if (!filteredConversations.length) { toast.error('No conversations to export'); return; }
+    setExporting(true);
+    try {
+      const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1).replace(/_/g, ' ') : '');
+      const rows = filteredConversations.map((c) => {
+        const digits = c.customerPhone.replace(/\D/g, '');
+        const lastMsg = (c.lastMessage || '').replace(/\s+/g, ' ').trim();
+        return {
+          phone:    digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits,
+          name:     (c.lead?.name && c.lead.name !== 'Incomplete' ? c.lead.name : '') || c.profileName || '',
+          interest: c.lead?.serviceInterest || '',
+          lastAt:   c.lastMessageAt,
+          lastMsg:  lastMsg.length > 150 ? `${lastMsg.slice(0, 150)}…` : lastMsg,
+          note:     c.chatNote || '',
+          stage:    capitalize(c.lead?.stage),
+          label:    labelMap[c.chatLabel]?.label || '',
+        };
+      });
+      const filters = [
+        labelFilter !== 'all' && `Label: ${labelFilter === 'none' ? 'Unlabelled' : labelMap[labelFilter]?.label}`,
+        searchQuery.trim() && `Search: "${searchQuery.trim()}"`,
+      ].filter(Boolean).join('   ·   ');
 
-    const headers = [
-      'Phone', 'Name', 'WhatsApp Name', 'Business', 'Label', 'Note',
-      'Lead Stage', 'Service Interest', 'Bot Step',
-      'Last Message', 'Last Direction', 'Last Message At',
-    ];
-
-    const escape = (val) => {
-      const s = String(val ?? '').replace(/"/g, '""');
-      return `"${s}"`;
-    };
-
-    const rows = conversations.map((c) => [
-      escape(c.customerPhone),
-      escape(c.lead?.name || ''),
-      escape(c.profileName || ''),
-      escape(c.businessId),
-      escape(c.chatLabel || ''),
-      escape(c.chatNote || ''),
-      escape(c.lead?.stage || ''),
-      escape(c.lead?.serviceInterest || ''),
-      escape(c.botStep || ''),
-      escape(c.lastMessage || ''),
-      escape(c.lastDirection || ''),
-      escape(c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString('en-IN') : ''),
-    ]);
-
-    const csv = [headers.map((h) => `"${h}"`).join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `whatsapp-inbox-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${conversations.length} conversations`);
+      await downloadCallingSheet(rows, { dateFrom, dateTo, filtersText: filters });
+      toast.success(`Exported ${rows.length} customers`);
+    } catch (err) {
+      console.error('[EXPORT]', err);
+      toast.error('Excel export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleSelect = (c) => {
@@ -419,6 +426,12 @@ export default function WhatsAppInbox() {
       return true;
     })
     .filter((c) => {
+      if (!dateFrom && !dateTo) return true;
+      if (!c.lastMessageAt) return false;
+      const day = toYMD(c.lastMessageAt);
+      return (!dateFrom || day >= dateFrom) && (!dateTo || day <= dateTo);
+    })
+    .filter((c) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.trim().toLowerCase();
       return (
@@ -461,7 +474,12 @@ export default function WhatsAppInbox() {
               <button onClick={() => setShowContactsExport(true)} title="Export all customer numbers" className="text-gray-400 hover:text-blue-600 p-1">
                 <Contact className="w-3.5 h-3.5" />
               </button>
-              <button onClick={handleExportCSV} title="Download Excel" className="text-gray-400 hover:text-green-600 p-1">
+              <button
+                onClick={handleExportExcel}
+                disabled={exporting}
+                title="Download calling list (Excel) — uses the filters below"
+                className="text-gray-400 hover:text-green-600 p-1 disabled:opacity-40 disabled:animate-pulse"
+              >
                 <Download className="w-3.5 h-3.5" />
               </button>
               <button onClick={() => fetchConversations()} className="text-gray-400 hover:text-gray-600 p-1">
@@ -477,6 +495,56 @@ export default function WhatsAppInbox() {
                 placeholder="Search by number or name…"
                 className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-300 bg-gray-50"
               />
+            </div>
+            {/* Date filter (last message date) */}
+            <div className="px-3 pb-2 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  title="Last message from"
+                  className="flex-1 min-w-0 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-300"
+                />
+                <span className="text-xs text-gray-400">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  title="Last message up to"
+                  className="flex-1 min-w-0 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-300"
+                />
+              </div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {[
+                  { label: 'Today',       from: daysAgoYMD(0), to: daysAgoYMD(0) },
+                  { label: 'Yesterday',   from: daysAgoYMD(1), to: daysAgoYMD(1) },
+                  { label: 'Last 7 days', from: daysAgoYMD(6), to: daysAgoYMD(0) },
+                ].map((p) => (
+                  <button
+                    key={p.label}
+                    onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
+                    className={`text-xs px-2 py-0.5 rounded-full transition-colors ${
+                      dateFrom === p.from && dateTo === p.to
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                {(dateFrom || dateTo) && (
+                  <button
+                    onClick={() => { setDateFrom(''); setDateTo(''); }}
+                    className="text-xs text-gray-400 hover:text-gray-600 px-1 flex items-center gap-0.5"
+                    title="Clear date filter"
+                  >
+                    <X className="w-3 h-3" /> Clear
+                  </button>
+                )}
+              </div>
             </div>
             {/* Label filter tabs */}
             <div className="px-3 pb-2 flex flex-wrap gap-1">
@@ -503,9 +571,9 @@ export default function WhatsAppInbox() {
               <div className="flex flex-col items-center justify-center py-16 text-gray-300 gap-3 px-6 text-center">
                 <MessageSquare className="w-10 h-10" />
                 <p className="text-sm">
-                  {labelFilter === 'all'
+                  {labelFilter === 'all' && !searchQuery.trim() && !dateFrom && !dateTo
                     ? 'No conversations yet.'
-                    : `No ${labelFilter === 'none' ? 'unlabelled' : labelMap[labelFilter]?.label} conversations.`}
+                    : 'No conversations match the current filters.'}
                 </p>
               </div>
             ) : (

@@ -59,8 +59,12 @@ const OFFERS_TEXT =
   `👨‍👩‍👧 *Refer & Earn:* ₹200 off per referral\n\n` +
   `⏰ _Offers limited time ke liye hain. Abhi book karein!_`;
 
+// Regular sofa price per seat (ad experiment). Sofa Cum Bed and sofa extras keep their own rates.
+// Previous slab: 2=220, 3=330, 4=440, 5=520, 6=600, 7=700, 8=800, 9=900, 10+=100/seat.
+const SOFA_PER_SEAT = 150;
+
 const FAQ = {
-  'Pricing & Payment': `💰 Rates market se 20% kam hain!\n\n🛋️ Sofa: ₹220 se shuru (2-seat)\n🛏️ Bed cleaning: ₹299 se\n🏠 Carpet: ₹300 se\n🚿 Bathroom: ₹350\n🪑 Dining chair: ₹80/chair\n\n💳 *Payment SIRF kaam complete hone ke baad!*\nCash, UPI, card — sab accept hota hai. Koi advance nahi!`,
+  'Pricing & Payment': `💰 Rates market se 20% kam hain!\n\n🛋️ Sofa: ₹${SOFA_PER_SEAT}/seat\n🛏️ Bed cleaning: ₹299 se\n🏠 Carpet: ₹300 se\n🚿 Bathroom: ₹350\n🪑 Dining chair: ₹80/chair\n\n💳 *Payment SIRF kaam complete hone ke baad!*\nCash, UPI, card — sab accept hota hai. Koi advance nahi!`,
   'How Long It Takes': `⏱️ *Service Duration:*\n\n🛋️ Sofa (2-3 seat): 1-1.5 ghanta\n🛏️ Mattress: 30-45 min\n🏠 Kitchen: 2-3 ghante\n🏡 Full 1 BHK: 4-5 ghante\n🏡 Full 2 BHK: 6-7 ghante\n\nHum time waaste nahi karte! ⚡`,
   'Chemicals & Safety': `🌿 *100% Eco-Friendly Chemicals*\n\nHamare products:\n✅ Bachon ke liye safe\n✅ Pets ke liye safe\n✅ Koi strong smell nahi\n✅ ISO certified cleaning agents\n✅ Surfaces damage nahi karte\n\nAap ghar mein reh sakte ho service ke dauran! 🏠`,
   'Cancellation Policy': `📋 *Flexible Cancellation:*\n\n✅ *2 ghante pehle:* Free cancel/reschedule\n⚠️ *1-2 ghante:* 50% cancellation fee\n❌ *Last minute:* Full charge\n\n_WhatsApp pe message karein — seedha response milega!_ 💬`,
@@ -85,12 +89,9 @@ const sofaShineConfig = {
   subServices: {
     // ── Sofa Cleaning: 4 regular + 3 cum bed + 3 extras = 10 rows (WhatsApp max) ──
     'Sofa Cleaning': [
-      { id: 'Sofa — 2 Seats', price: 220, section: '🛋️ Regular Sofa', desc: 'Steam + stain treat + dry · ₹220' },
-      { id: 'Sofa — 3 Seats', price: 330, section: '🛋️ Regular Sofa', desc: 'Steam + stain treat + dry · ₹330' },
-      { id: 'Sofa — 4 Seats', price: 440, section: '🛋️ Regular Sofa', desc: 'Steam + stain treat + dry · ₹440' },
-      { id: 'Sofa — 5+ Seats', price: 0, section: '🛋️ Regular Sofa',
-        desc: '5=₹520 · 6=₹600 · 7=₹700 · 8=₹800 · 9=₹900 · 10+=₹100/seat',
-        askCount: true, unitPrice: 100, priceMap: { 5: 520, 6: 600, 7: 700, 8: 800, 9: 900 } },
+      { id: 'Sofa — Per Seat', price: 0, section: '🛋️ Regular Sofa',
+        desc: `Steam + stain treat + dry · ₹${SOFA_PER_SEAT}/seat`,
+        askCount: true, perSeat: true, unitPrice: SOFA_PER_SEAT, priceMap: null },
       { id: 'Sofa Cum Bed 1 Seat', price: 300, section: '🛋️ Sofa Cum Bed', desc: 'Full clean + dry · ₹300' },
       { id: 'Sofa Cum Bed 2 Seat', price: 450, section: '🛋️ Sofa Cum Bed', desc: 'Full clean + dry · ₹450' },
       { id: 'Sofa Cum Bed 3-4 Seat', price: 0, section: '🛋️ Sofa Cum Bed',
@@ -174,9 +175,9 @@ const BUSINESSES = {
 // Upsell suggestion per service (shown after first item added to cart)
 const UPSELL = {
   'Sofa Cleaning':     { emoji: '🛏️', text: 'Sofa ke saath Bed cleaning bhi add karein? Single bed sirf ₹299 mein! ✨' },
-  'Bed Cleaning':      { emoji: '🛋️', text: 'Bed ke saath Sofa bhi clean karwayein? 2-seater sirf ₹220 mein — ekdum naya feel!' },
-  'Bathroom Cleaning': { emoji: '🛋️', text: 'Bathroom ke saath Sofa cleaning bhi add karein? 2-seater ₹220 mein — ek trip, sab done!' },
-  'Chairs & Items':    { emoji: '🛋️', text: 'Chairs ke saath Sofa bhi clean karein? 2-seater ₹220 mein — team already aa rahi hai!' },
+  'Bed Cleaning':      { emoji: '🛋️', text: `Bed ke saath Sofa bhi clean karwayein? Sirf ₹${SOFA_PER_SEAT}/seat — ekdum naya feel!` },
+  'Bathroom Cleaning': { emoji: '🛋️', text: `Bathroom ke saath Sofa cleaning bhi add karein? Sirf ₹${SOFA_PER_SEAT}/seat — ek trip, sab done!` },
+  'Chairs & Items':    { emoji: '🛋️', text: `Chairs ke saath Sofa bhi clean karein? Sirf ₹${SOFA_PER_SEAT}/seat — team already aa rahi hai!` },
   'Pest Control':      { emoji: '🏠', text: 'Sirf ₹300 extra mein full home pest control upgrade karein — cockroach + ants + all insects!' },
 };
 
@@ -294,7 +295,6 @@ const askService = async (to, biz, phoneNumberId, token) => {
 
 // ── Master Quick-Order (all services, text-based, one message) ────────────────
 
-const SOFA_PRICES      = { 2: 220, 3: 330, 4: 440, 5: 520, 6: 600, 7: 700, 8: 800, 9: 900 };
 const CUM_BED_PRICES   = { 1: 300, 2: 450, 3: 650, 4: 850 };
 const COCKROACH_PRICES = { 1: 749, 2: 899, 3: 1100, 4: 1300 };
 const BED_BUG_PRICES   = { 1: 999, 2: 1299, 3: 1799, 4: 2199 };
@@ -321,12 +321,12 @@ const parseMasterOrder = (rawText) => {
       continue;
     }
 
-    // 2. Regular Sofa — number = seat count (2-9 fixed price, 10+ = ₹100/seat)
+    // 2. Regular Sofa — number = seat count, flat per-seat price
     if (/\bsofa\b|\bseater\b/.test(seg)) {
       const n = parseInt(seg.match(/\d+/)?.[0]);
-      if (n >= 2) {
-        const price = SOFA_PRICES[n] ?? n * 100;
-        items.push({ service: 'Sofa Cleaning', subService: `Sofa — ${n} Seats`, price, quantity: 1, unitPrice: price });
+      if (n >= 1) {
+        const price = n * SOFA_PER_SEAT;
+        items.push({ service: 'Sofa Cleaning', subService: `Sofa — ${n} Seat${n > 1 ? 's' : ''}`, price, quantity: 1, unitPrice: price });
         continue;
       }
     }
@@ -447,15 +447,7 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     `━━━━━━━━━━━━━━━━━━\n` +
     `🛋️ *SOFA CLEANING*\n` +
     `_Steam + daag hatao + deodorise · 2-4 hrs mein dry_\n` +
-    `• sofa 2 seat  →  ₹220\n` +
-    `• sofa 3 seat  →  ₹330\n` +
-    `• sofa 4 seat  →  ₹440\n` +
-    `• sofa 5 seat  →  ₹520\n` +
-    `• sofa 6 seat  →  ₹600\n` +
-    `• sofa 7 seat  →  ₹700\n` +
-    `• sofa 8 seat  →  ₹800\n` +
-    `• sofa 9 seat  →  ₹900\n` +
-    `• sofa 10+ seat  →  ₹100/seat\n\n` +
+    `• sofa  →  ₹${SOFA_PER_SEAT} / seat\n\n` +
 
    
     `━━━━━━━━━━━━━━━━━━\n` +
@@ -716,7 +708,7 @@ const sendPriceList = async (to, biz, phoneNumberId, token) => {
   for (const [svc, items] of Object.entries(biz.subServices || {})) {
     msg += `*${svc}:*\n`;
     for (const item of items.slice(0, 5)) {
-      msg += `  • ${item.id}: ${item.price > 0 ? `₹${item.price}` : 'Custom quote'}\n`;
+      msg += `  • ${item.id}: ${item.price > 0 ? `₹${item.price}` : item.perSeat ? `₹${item.unitPrice}/seat` : 'Custom quote'}\n`;
     }
     if (items.length > 5) msg += `  _(+ ${items.length - 5} more)_\n`;
     msg += '\n';
@@ -1154,7 +1146,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
       } else if (subSvc.startsWith('Sofa Cum Bed')) {
         label = `Sofa Cum Bed — ${n} Seat`;
       } else {
-        label = `Sofa — ${n} Seats`;
+        label = `Sofa — ${n} Seat${n > 1 ? 's' : ''}`;
       }
       const existing = Array.isArray(conv.data.selectedServices) ? conv.data.selectedServices : [];
       const isFirst  = existing.length === 0;

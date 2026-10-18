@@ -211,7 +211,6 @@ const DC_EXTRA_PRICE = 350; // per extra bathroom or balcony
 const DC_IMAGE_VERSION = 1;
 const DC_IMG = {
   prices:      'dc-prices.jpg',
-  package:     'dc-package.jpg',
   included:    'dc-included.jpg',
   notIncluded: 'dc-not-included.jpg',
 };
@@ -223,8 +222,6 @@ const mediaUrl = (file) => {
 };
 
 const inr     = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
-const icons   = (emoji, n) => emoji.repeat(Math.min(n, 5));
-const plural  = (n, one, many) => (n === 1 ? one : many);
 const dcLabel = (bhk) => `${DC_SERVICE} — ${bhk} BHK`;
 const isDeepCleaningCart = (cart) => (cart || []).some((i) => i.service === DC_SERVICE);
 
@@ -904,19 +901,14 @@ const sendIncludedDetails = async (to, phoneNumberId, token) => {
 const sendPackageChosen = async (to, bhk, phoneNumberId, token) => {
   await sendButtons(to,
     `✅ *${bhk} BHK Deep Cleaning — ${inr(DC_PACKAGES[bhk])}*\n\n` +
-    `*Is package mein included:*\n` +
-    `${icons('🛏️', bhk)}  ${bhk} ${plural(bhk, 'Bedroom', 'Bedrooms')}\n` +
-    `${icons('🚿', bhk)}  ${bhk} ${plural(bhk, 'Bathroom', 'Bathrooms')}\n` +
-    `${icons('🪴', bhk)}  ${bhk} ${plural(bhk, 'Balcony', 'Balconies')}\n` +
-    `🍳 Kitchen · 🛋️ Hall · 🌀 Fans · 🪟 Windows\n\n` +
-    `❓ *Ghar mein isse zyada bathroom ya balcony hai?*\n` +
+    `❓ *Ghar mein ${bhk} se zyada bathroom ya balcony hai?*\n` +
     `_Extra: ${inr(DC_EXTRA_PRICE)} each_`,
     [
       { id: 'DC_NO_EXTRA',    title: '✅ Nahi, bas itna' },
       { id: 'DC_HAS_EXTRA',   title: '➕ Haan, extra hai' },
       { id: 'DC_CHANGE_SIZE', title: '🔄 Size badlo' },
     ],
-    phoneNumberId, token, mediaUrl(DC_IMG.package)
+    phoneNumberId, token
   );
 };
 

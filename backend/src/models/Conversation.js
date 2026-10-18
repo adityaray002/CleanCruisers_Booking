@@ -24,9 +24,6 @@ const conversationSchema = new mongoose.Schema({
       'AWAITING_EXISTING_BOOKING',
       'AWAITING_FAQ',
       'AWAITING_BHK',
-      'AWAITING_DC_EXTRAS',
-      'AWAITING_DC_EXTRA_BATH',
-      'AWAITING_DC_EXTRA_BALCONY',
       'AWAITING_DC_SUMMARY',
       'COMPLETED',
     ],
@@ -45,8 +42,6 @@ const conversationSchema = new mongoose.Schema({
     pendingUnitPrice:  Number,
     pendingPriceMap:   { type: mongoose.Schema.Types.Mixed },
     dcBhk:             Number,
-    dcExtraBath:       Number,
-    dcExtraBalcony:    Number,
   },
   lastActivity: { type: Date, default: Date.now },
 }, { timestamps: true });

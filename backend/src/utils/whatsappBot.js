@@ -206,7 +206,6 @@ const UPSELL = {
 // ── Full Home Deep Cleaning (BHK packages, from SofaShine_Full_Home_Deep_Cleaning.pdf) ──
 const DC_SERVICE     = 'Deep Cleaning';
 const DC_PACKAGES    = { 1: 2800, 2: 3500, 3: 4500, 4: 5700, 5: 7000 }; // each BHK includes N bedrooms, bathrooms, balconies
-const DC_EXTRA_PRICE = 350; // per extra bathroom or balcony
 // Files live in backend/public/bot. Bump the version after replacing a file so Meta re-downloads it.
 const DC_IMAGE_VERSION = 1;
 const DC_IMG = {
@@ -251,23 +250,9 @@ const parseBhk = (text) => {
   return m ? parseInt(m[1]) : null;
 };
 
-// "DC_X_2" or a typed number 0-10 -> count
-const parseExtra = (text) => {
-  const m = String(text || '').trim().match(/^(?:DC_X_)?(\d{1,2})$/i);
-  const n = m ? parseInt(m[1]) : NaN;
-  return n >= 0 && n <= 10 ? n : null;
-};
-
-const buildDcCart = ({ dcBhk, dcExtraBath = 0, dcExtraBalcony = 0 }) => {
-  const cart = [{ service: DC_SERVICE, subService: dcLabel(dcBhk), price: DC_PACKAGES[dcBhk], quantity: 1, unitPrice: DC_PACKAGES[dcBhk] }];
-  if (dcExtraBath > 0) {
-    cart.push({ service: DC_SERVICE, subService: 'Extra Bathroom', price: dcExtraBath * DC_EXTRA_PRICE, quantity: dcExtraBath, unitPrice: DC_EXTRA_PRICE });
-  }
-  if (dcExtraBalcony > 0) {
-    cart.push({ service: DC_SERVICE, subService: 'Extra Balcony', price: dcExtraBalcony * DC_EXTRA_PRICE, quantity: dcExtraBalcony, unitPrice: DC_EXTRA_PRICE });
-  }
-  return cart;
-};
+const buildDcCart = (bhk) => [
+  { service: DC_SERVICE, subService: dcLabel(bhk), price: DC_PACKAGES[bhk], quantity: 1, unitPrice: DC_PACKAGES[bhk] },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -898,41 +883,8 @@ const sendIncludedDetails = async (to, phoneNumberId, token) => {
   if (!a || !b) await sendText(to, DC_INCLUDED_TEXT, phoneNumberId, token);
 };
 
-const sendPackageChosen = async (to, bhk, phoneNumberId, token) => {
-  await sendButtons(to,
-    `✅ *${bhk} BHK Deep Cleaning — ${inr(DC_PACKAGES[bhk])}*\n\n` +
-    `❓ *Ghar mein ${bhk} se zyada bathroom ya balcony hai?*\n` +
-    `_Extra: ${inr(DC_EXTRA_PRICE)} each_`,
-    [
-      { id: 'DC_NO_EXTRA',    title: '✅ Nahi, bas itna' },
-      { id: 'DC_HAS_EXTRA',   title: '➕ Haan, extra hai' },
-      { id: 'DC_CHANGE_SIZE', title: '🔄 Size badlo' },
-    ],
-    phoneNumberId, token
-  );
-};
-
-const askExtraCount = async (to, what, phoneNumberId, token) => {
-  const isBath = what === 'bath';
-  await sendButtons(to,
-    `${isBath ? '🚿' : '🪴'} *Kitne extra ${isBath ? 'bathroom' : 'balcony'}?*\n\n` +
-    `_Package ke alawa · ${inr(DC_EXTRA_PRICE)} each_\n` +
-    `_(Zyada hain to number type karein)_`,
-    [
-      { id: 'DC_X_0', title: '0️⃣ Koi nahi' },
-      { id: 'DC_X_1', title: '1️⃣ 1 extra' },
-      { id: 'DC_X_2', title: '2️⃣ 2 extra' },
-    ],
-    phoneNumberId, token
-  );
-};
-
-const DC_ITEM_ICON = { 'Extra Bathroom': '🚿', 'Extra Balcony': '🪴' };
-
 const sendDcSummary = async (to, cart, phoneNumberId, token) => {
-  const lines = cart.map((i) =>
-    `${DC_ITEM_ICON[i.subService] || '🏠'} ${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''} — ${inr(i.price)}`
-  ).join('\n');
+  const lines = cart.map((i) => `🏠 ${i.subService} — ${inr(i.price)}`).join('\n');
   await sendButtons(to,
     `🧾 *Aapka Package*\n` +
     `━━━━━━━━━━━━━━━\n` +
@@ -949,23 +901,10 @@ const sendDcSummary = async (to, cart, phoneNumberId, token) => {
   );
 };
 
-// Saves extra counts, builds the cart, updates the lead and shows the bill
-const goToDcSummary = async (conv, to, updates, phoneNumberId, token) => {
-  const cart = buildDcCart({ ...conv.data, ...updates });
-  await save(conv, 'AWAITING_DC_SUMMARY', { ...updates, selectedServices: cart });
-  if (conv.data.leadId) {
-    Lead.findByIdAndUpdate(conv.data.leadId, {
-      serviceInterest: cart.map((i) => `${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''}`).join(' + '),
-      quotedAmount:    cartTotal(cart),
-    }).catch(() => {});
-  }
-  await sendDcSummary(to, cart, phoneNumberId, token);
-};
-
 // "Book Cleaning" entry point — routes by the admin's booking-mode toggle
 const startBooking = async (conv, biz, to, phoneNumberId, token) => {
   if (await getBookingMode(biz) === 'deep_cleaning') {
-    await save(conv, 'AWAITING_BHK', { service: DC_SERVICE, selectedServices: [], dcBhk: null, dcExtraBath: 0, dcExtraBalcony: 0 });
+    await save(conv, 'AWAITING_BHK', { service: DC_SERVICE, selectedServices: [], dcBhk: null });
     await sendBhkMenu(to, phoneNumberId, token);
   } else if (biz.id === 'sofashine') {
     await save(conv, 'AWAITING_QUICK_ORDER', { selectedServices: [] });
@@ -1106,40 +1045,13 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           notes: 'WhatsApp bot — Full Home Deep Cleaning enquiry',
         });
         leadId = partial._id.toString();
-      }
-      await save(conv, 'AWAITING_DC_EXTRAS', { leadId, dcBhk: bhk, dcExtraBath: 0, dcExtraBalcony: 0 });
-      await sendPackageChosen(from, bhk, phoneNumberId, token);
-      break;
-    }
-
-    // ── Deep Cleaning: any extra bathroom / balcony? ──────────────────────────
-    case 'AWAITING_DC_EXTRAS': {
-      if (text === 'DC_NO_EXTRA') {
-        await goToDcSummary(conv, from, { dcExtraBath: 0, dcExtraBalcony: 0 }, phoneNumberId, token);
-      } else if (text === 'DC_HAS_EXTRA') {
-        await save(conv, 'AWAITING_DC_EXTRA_BATH');
-        await askExtraCount(from, 'bath', phoneNumberId, token);
-      } else if (text === 'DC_CHANGE_SIZE') {
-        await save(conv, 'AWAITING_BHK');
-        await sendBhkMenu(from, phoneNumberId, token);
       } else {
-        await sendPackageChosen(from, conv.data.dcBhk, phoneNumberId, token);
+        Lead.findByIdAndUpdate(leadId, { serviceInterest: dcLabel(bhk), quotedAmount: DC_PACKAGES[bhk] }).catch(() => {});
       }
-      break;
-    }
-
-    case 'AWAITING_DC_EXTRA_BATH': {
-      const n = parseExtra(text);
-      if (n === null) { await askExtraCount(from, 'bath', phoneNumberId, token); break; }
-      await save(conv, 'AWAITING_DC_EXTRA_BALCONY', { dcExtraBath: n });
-      await askExtraCount(from, 'balcony', phoneNumberId, token);
-      break;
-    }
-
-    case 'AWAITING_DC_EXTRA_BALCONY': {
-      const n = parseExtra(text);
-      if (n === null) { await askExtraCount(from, 'balcony', phoneNumberId, token); break; }
-      await goToDcSummary(conv, from, { dcExtraBalcony: n }, phoneNumberId, token);
+      const cart = buildDcCart(bhk);
+      await save(conv, 'AWAITING_DC_SUMMARY', { leadId, dcBhk: bhk, selectedServices: cart });
+      await sendIncludedDetails(from, phoneNumberId, token);
+      await sendDcSummary(from, cart, phoneNumberId, token);
       break;
     }
 

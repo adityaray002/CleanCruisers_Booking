@@ -39,9 +39,6 @@ const STEP_LABEL = {
   AWAITING_CONFIRM:        'Confirming booking',
   AWAITING_QUICK_ORDER:    'Typing order',
   AWAITING_BHK:            'Choosing home size',
-  AWAITING_DC_EXTRAS:      'Checking extras',
-  AWAITING_DC_EXTRA_BATH:  'Extra bathrooms',
-  AWAITING_DC_EXTRA_BALCONY: 'Extra balconies',
   AWAITING_DC_SUMMARY:     'Reviewing package',
   COMPLETED:               'Done ✓',
 };

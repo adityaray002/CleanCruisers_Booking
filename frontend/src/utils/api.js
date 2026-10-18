@@ -107,6 +107,11 @@ export const leadsAPI = {
   convert:  (id, data) => api.post(`/leads/${id}/convert`, data),
 };
 
+export const settingsAPI = {
+  getBot:    (businessId = 'sofashine') => api.get('/settings/bot', { params: { businessId } }),
+  updateBot: (data)                     => api.put('/settings/bot', data),
+};
+
 export const inboxAPI = {
   getAll:       (silent = false)                  => api.get('/inbox', { silent }),
   getContacts:  ()                                => api.get('/inbox/contacts'),

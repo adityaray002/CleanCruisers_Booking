@@ -1,7 +1,8 @@
 const Conversation = require('../models/Conversation');
 const Lead         = require('../models/Lead');
 const Message      = require('../models/Message');
-const { sendText: _sendText, sendButtons: _sendButtons, sendList: _sendList } = require('./metaWhatsApp');
+const BotSetting   = require('../models/BotSetting');
+const { sendText: _sendText, sendImage: _sendImage, sendButtons: _sendButtons, sendList: _sendList } = require('./metaWhatsApp');
 const { getAvailableSlots } = require('./slotManager');
 
 // ── Inbox message saving (outbound bot → WhatsApp Inbox) ─────────────────────
@@ -13,13 +14,34 @@ const sendText = async (to, text, phoneNumberId, token) => {
   if (bizId) Message.create({ customerPhone: to, businessId: bizId, direction: 'outbound', text, sentBy: 'bot' }).catch(() => {});
 };
 
-const sendButtons = async (to, bodyText, buttons, phoneNumberId, token) => {
-  await _sendButtons(to, bodyText, buttons, phoneNumberId, token);
+// headerImage is optional; if Meta rejects it, resend without so the customer still gets the buttons
+const sendButtons = async (to, bodyText, buttons, phoneNumberId, token, headerImage = null) => {
+  try {
+    await _sendButtons(to, bodyText, buttons, phoneNumberId, token, headerImage);
+  } catch (err) {
+    if (!headerImage) throw err;
+    console.warn('[BOT] Image header failed, sending buttons without it');
+    await _sendButtons(to, bodyText, buttons, phoneNumberId, token);
+  }
   const bizId = _phoneBizMap.get(to);
   if (bizId) {
     const opts = buttons.map((b) => b.title).join(' · ');
     Message.create({ customerPhone: to, businessId: bizId, direction: 'outbound', text: `${bodyText}\n[${opts}]`, sentBy: 'bot', msgType: 'interactive' }).catch(() => {});
   }
+};
+
+// Images are a nice-to-have: returns false instead of throwing so the flow continues with text
+const sendImage = async (to, link, caption, phoneNumberId, token) => {
+  if (!link) return false;
+  try {
+    await _sendImage(to, link, caption, phoneNumberId, token);
+  } catch {
+    console.warn('[BOT] Image send failed:', link);
+    return false;
+  }
+  const bizId = _phoneBizMap.get(to);
+  if (bizId) Message.create({ customerPhone: to, businessId: bizId, direction: 'outbound', text: `📷 ${caption || 'Image'}`, sentBy: 'bot', msgType: 'image' }).catch(() => {});
+  return true;
 };
 
 const sendList = async (to, header, body, sections, phoneNumberId, token) => {
@@ -181,9 +203,89 @@ const UPSELL = {
   'Pest Control':      { emoji: '🏠', text: 'Sirf ₹300 extra mein full home pest control upgrade karein — cockroach + ants + all insects!' },
 };
 
+// ── Full Home Deep Cleaning (BHK packages, from SofaShine_Full_Home_Deep_Cleaning.pdf) ──
+const DC_SERVICE     = 'Deep Cleaning';
+const DC_PACKAGES    = { 1: 2800, 2: 3500, 3: 4500, 4: 5700, 5: 7000 }; // each BHK includes N bedrooms, bathrooms, balconies
+const DC_EXTRA_PRICE = 350; // per extra bathroom or balcony
+// Files live in backend/public/bot. Bump the version after replacing a file so Meta re-downloads it.
+const DC_IMAGE_VERSION = 1;
+const DC_IMG = {
+  prices:      'dc-prices.jpg',
+  package:     'dc-package.jpg',
+  included:    'dc-included.jpg',
+  notIncluded: 'dc-not-included.jpg',
+};
+
+// Meta fetches images by public URL; without one (local dev) the bot falls back to text
+const mediaUrl = (file) => {
+  const base = (process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
+  return base ? `${base}/media/bot/${file}?v=${DC_IMAGE_VERSION}` : null;
+};
+
+const inr     = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+const icons   = (emoji, n) => emoji.repeat(Math.min(n, 5));
+const plural  = (n, one, many) => (n === 1 ? one : many);
+const dcLabel = (bhk) => `${DC_SERVICE} — ${bhk} BHK`;
+const isDeepCleaningCart = (cart) => (cart || []).some((i) => i.service === DC_SERVICE);
+
+const DC_INCLUDED_TEXT =
+  `📋 *Package mein kya included hai*\n` +
+  `🧹 Room floor — cleaning chemicals se\n` +
+  `🚪 Cabinet & furniture — bahar se wiping\n` +
+  `🌀 Ceiling & fan dusting\n` +
+  `🛋️ Sofa & mattress — dry dusting\n` +
+  `🪟 Doors, windows & mirrors\n` +
+  `🔌 Switch boards & fixtures\n` +
+  `🚰 Kitchen sink area — tiles & slab\n` +
+  `🍳 Stove & kitchen appliances\n` +
+  `🗄️ Kitchen cabinets — andar & bahar\n` +
+  `🚿 Bathroom — WC, sink, tiles & fittings\n` +
+  `🪴 Balcony\n\n` +
+  `❌ *Included nahi hai*\n` +
+  `• Glue, paint ke daag & stickers\n` +
+  `• Terrace & jahan safely pahunch na sakein\n` +
+  `• Deewar aur chhat ki geeli safai\n` +
+  `• Upar ki manzil ka bahar ka glass (balcony na ho to)\n\n` +
+  `📸 _Doubt hai? Photo bhej dijiye — visit se pehle bata denge_`;
+
+// "DC_BHK_3", "3", "3bhk", "3 BHK" -> 3
+const parseBhk = (text) => {
+  const m = String(text || '').trim().match(/^(?:DC_BHK_)?([1-5])\s*(?:bhk)?$/i);
+  return m ? parseInt(m[1]) : null;
+};
+
+// "DC_X_2" or a typed number 0-10 -> count
+const parseExtra = (text) => {
+  const m = String(text || '').trim().match(/^(?:DC_X_)?(\d{1,2})$/i);
+  const n = m ? parseInt(m[1]) : NaN;
+  return n >= 0 && n <= 10 ? n : null;
+};
+
+const buildDcCart = ({ dcBhk, dcExtraBath = 0, dcExtraBalcony = 0 }) => {
+  const cart = [{ service: DC_SERVICE, subService: dcLabel(dcBhk), price: DC_PACKAGES[dcBhk], quantity: 1, unitPrice: DC_PACKAGES[dcBhk] }];
+  if (dcExtraBath > 0) {
+    cart.push({ service: DC_SERVICE, subService: 'Extra Bathroom', price: dcExtraBath * DC_EXTRA_PRICE, quantity: dcExtraBath, unitPrice: DC_EXTRA_PRICE });
+  }
+  if (dcExtraBalcony > 0) {
+    cart.push({ service: DC_SERVICE, subService: 'Extra Balcony', price: dcExtraBalcony * DC_EXTRA_PRICE, quantity: dcExtraBalcony, unitPrice: DC_EXTRA_PRICE });
+  }
+  return cart;
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const getBusiness = (phoneNumberId) => BUSINESSES[phoneNumberId] || null;
+
+// Admin toggle (WhatsApp Inbox): what "Book Cleaning" opens. Only SofaShine has the deep-cleaning flow.
+const getBookingMode = async (biz) => {
+  if (biz.id !== 'sofashine') return 'classic';
+  try {
+    return await BotSetting.getBookingMode(biz.id);
+  } catch (err) {
+    console.error('[BOT] Could not read booking mode, using default:', err.message);
+    return 'deep_cleaning';
+  }
+};
 
 const getOrCreate = async (customerPhone, businessId) => {
   let conv = await Conversation.findOne({ customerPhone, businessId });
@@ -251,6 +353,28 @@ const sendWelcome = async (to, biz, phoneNumberId, token, isReturning = false) =
     ? `Wapas aaye! Hamare parivaar mein aapka swagat hai 🙏`
     : `Namaste! *${biz.name}* mein aapka swagat hai 🙏`;
 
+  // Deep cleaning mode: one visual message — price card image on top, buttons below
+  if (await getBookingMode(biz) === 'deep_cleaning') {
+    await sendButtons(to,
+      `${greeting}\n\n` +
+      `🏠 *Full Home Deep Cleaning*\n` +
+      `Poora ghar chamka denge — *ek fixed price* mein ✨\n` +
+      `_1 BHK sirf ${inr(DC_PACKAGES[1])} se shuru_\n\n` +
+      `✅ Trained & verified team\n` +
+      `🌿 Eco-friendly — kids & pets safe\n` +
+      `⚡ Same day service\n` +
+      `💳 Payment kaam ke baad\n` +
+      `💯 100% satisfaction guarantee\n\n` +
+      `👇 *Book karne ke liye neeche dabayein*`,
+      [
+        { id: 'MENU_BOOK',     title: '🏠 Book Deep Clean' },
+        { id: 'MENU_EXISTING', title: '📦 Existing Booking' },
+      ],
+      phoneNumberId, token, mediaUrl(DC_IMG.prices)
+    );
+    return;
+  }
+
   await sendText(to,
     `${greeting}\n\n` +
     `✨ *Premium Home Cleaning — ${biz.tagline || biz.name}*\n\n` +
@@ -268,7 +392,6 @@ const sendWelcome = async (to, biz, phoneNumberId, token, isReturning = false) =
     `_Neeche se option chunein:_`,
     [
       { id: 'MENU_BOOK',     title: '🧹 Book Cleaning' },
-      { id: 'MENU_EXPERT',   title: '💬 Talk to Expert' },
       { id: 'MENU_EXISTING', title: '📦 Existing Booking' },
     ],
     phoneNumberId, token
@@ -680,7 +803,7 @@ const sendBookingDone = async (to, name, bizName, phoneNumberId, token, data = {
   const lines     = services.map((i) =>
     `  🧹 ${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''} — ₹${i.price}`
   ).join('\n');
-  const bookingRef = `SS${Date.now().toString().slice(-6)}`;
+  const bookingRef = `${isDeepCleaningCart(services) ? 'DC' : 'SS'}${Date.now().toString().slice(-6)}`;
 
   await sendText(to,
     `🎉 *Booking Confirmed! Shukriya ${name}!* 🙏\n\n` +
@@ -750,6 +873,117 @@ const sendReturnToMenu = async (to, phoneNumberId, token) => {
   );
 };
 
+// ── Deep cleaning screens ─────────────────────────────────────────────────────
+
+const sendBhkMenu = async (to, phoneNumberId, token) => {
+  const rows = Object.entries(DC_PACKAGES).map(([bhk, price]) => ({
+    id:          `DC_BHK_${bhk}`,
+    title:       `${bhk} BHK — ${inr(price)}`,
+    description: `🛏️ ${bhk} Bedroom · 🚿 ${bhk} Bathroom · 🪴 ${bhk} Balcony`,
+  }));
+  await sendList(to,
+    `🏠 *Aapka ghar kitna bada hai?*\n\n` +
+    `Ek fixed price — poore ghar ki deep cleaning ✨\n` +
+    `_Bedrooms, bathrooms aur balconies price mein included hain_\n\n` +
+    `👇 *Size Chunein* dabayein`,
+    `Size Chunein`,
+    [
+      { title: '🏠 Home Size', rows },
+      { title: 'ℹ️ Details', rows: [{ id: 'DC_INCLUDED', title: '📋 Kya kya included hai?', description: 'Photos ke saath poori list dekhein' }] },
+    ],
+    phoneNumberId, token
+  );
+};
+
+const sendIncludedDetails = async (to, phoneNumberId, token) => {
+  const a = await sendImage(to, mediaUrl(DC_IMG.included), '✅ Package mein ye sab included hai', phoneNumberId, token);
+  const b = await sendImage(to, mediaUrl(DC_IMG.notIncluded), '❌ Ye included nahi hai — taaki koi confusion na rahe', phoneNumberId, token);
+  if (!a || !b) await sendText(to, DC_INCLUDED_TEXT, phoneNumberId, token);
+};
+
+const sendPackageChosen = async (to, bhk, phoneNumberId, token) => {
+  await sendButtons(to,
+    `✅ *${bhk} BHK Deep Cleaning — ${inr(DC_PACKAGES[bhk])}*\n\n` +
+    `*Is package mein included:*\n` +
+    `${icons('🛏️', bhk)}  ${bhk} ${plural(bhk, 'Bedroom', 'Bedrooms')}\n` +
+    `${icons('🚿', bhk)}  ${bhk} ${plural(bhk, 'Bathroom', 'Bathrooms')}\n` +
+    `${icons('🪴', bhk)}  ${bhk} ${plural(bhk, 'Balcony', 'Balconies')}\n` +
+    `🍳 Kitchen · 🛋️ Hall · 🌀 Fans · 🪟 Windows\n\n` +
+    `❓ *Ghar mein isse zyada bathroom ya balcony hai?*\n` +
+    `_Extra: ${inr(DC_EXTRA_PRICE)} each_`,
+    [
+      { id: 'DC_NO_EXTRA',    title: '✅ Nahi, bas itna' },
+      { id: 'DC_HAS_EXTRA',   title: '➕ Haan, extra hai' },
+      { id: 'DC_CHANGE_SIZE', title: '🔄 Size badlo' },
+    ],
+    phoneNumberId, token, mediaUrl(DC_IMG.package)
+  );
+};
+
+const askExtraCount = async (to, what, phoneNumberId, token) => {
+  const isBath = what === 'bath';
+  await sendButtons(to,
+    `${isBath ? '🚿' : '🪴'} *Kitne extra ${isBath ? 'bathroom' : 'balcony'}?*\n\n` +
+    `_Package ke alawa · ${inr(DC_EXTRA_PRICE)} each_\n` +
+    `_(Zyada hain to number type karein)_`,
+    [
+      { id: 'DC_X_0', title: '0️⃣ Koi nahi' },
+      { id: 'DC_X_1', title: '1️⃣ 1 extra' },
+      { id: 'DC_X_2', title: '2️⃣ 2 extra' },
+    ],
+    phoneNumberId, token
+  );
+};
+
+const DC_ITEM_ICON = { 'Extra Bathroom': '🚿', 'Extra Balcony': '🪴' };
+
+const sendDcSummary = async (to, cart, phoneNumberId, token) => {
+  const lines = cart.map((i) =>
+    `${DC_ITEM_ICON[i.subService] || '🏠'} ${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''} — ${inr(i.price)}`
+  ).join('\n');
+  await sendButtons(to,
+    `🧾 *Aapka Package*\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    `${lines}\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    `💰 *Total: ${inr(cartTotal(cart))}*\n` +
+    `💳 _Payment kaam complete hone ke baad_\n\n` +
+    `Aage badhein? 👇`,
+    [
+      { id: 'DC_CONTINUE',    title: '✅ Book Karein' },
+      { id: 'DC_CHANGE_SIZE', title: '🔄 Badlaav karein' },
+    ],
+    phoneNumberId, token
+  );
+};
+
+// Saves extra counts, builds the cart, updates the lead and shows the bill
+const goToDcSummary = async (conv, to, updates, phoneNumberId, token) => {
+  const cart = buildDcCart({ ...conv.data, ...updates });
+  await save(conv, 'AWAITING_DC_SUMMARY', { ...updates, selectedServices: cart });
+  if (conv.data.leadId) {
+    Lead.findByIdAndUpdate(conv.data.leadId, {
+      serviceInterest: cart.map((i) => `${i.subService}${i.quantity > 1 ? ` ×${i.quantity}` : ''}`).join(' + '),
+      quotedAmount:    cartTotal(cart),
+    }).catch(() => {});
+  }
+  await sendDcSummary(to, cart, phoneNumberId, token);
+};
+
+// "Book Cleaning" entry point — routes by the admin's booking-mode toggle
+const startBooking = async (conv, biz, to, phoneNumberId, token) => {
+  if (await getBookingMode(biz) === 'deep_cleaning') {
+    await save(conv, 'AWAITING_BHK', { service: DC_SERVICE, selectedServices: [], dcBhk: null, dcExtraBath: 0, dcExtraBalcony: 0 });
+    await sendBhkMenu(to, phoneNumberId, token);
+  } else if (biz.id === 'sofashine') {
+    await save(conv, 'AWAITING_QUICK_ORDER', { selectedServices: [] });
+    await sendMasterPriceCard(to, phoneNumberId, token);
+  } else {
+    await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
+    await askService(to, biz, phoneNumberId, token);
+  }
+};
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
@@ -794,13 +1028,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
 
   // Book button from return-to-menu shortcut
   if (text === 'MENU_BOOK' && conv.step !== 'AWAITING_MAIN_MENU') {
-    if (biz.id === 'sofashine') {
-      await save(conv, 'AWAITING_QUICK_ORDER', { selectedServices: [] });
-      await sendMasterPriceCard(from, phoneNumberId, token);
-    } else {
-      await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
-      await askService(from, biz, phoneNumberId, token);
-    }
+    await startBooking(conv, biz, from, phoneNumberId, token);
     return;
   }
 
@@ -828,13 +1056,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
     case 'AWAITING_MAIN_MENU': {
       switch (text) {
         case 'MENU_BOOK':
-          if (biz.id === 'sofashine') {
-            await save(conv, 'AWAITING_QUICK_ORDER', { selectedServices: [] });
-            await sendMasterPriceCard(from, phoneNumberId, token);
-          } else {
-            await save(conv, 'AWAITING_SERVICE', { selectedServices: [] });
-            await askService(from, biz, phoneNumberId, token);
-          }
+          await startBooking(conv, biz, from, phoneNumberId, token);
           break;
         case 'MENU_PRICE':
           await sendPriceList(from, biz, phoneNumberId, token);
@@ -854,17 +1076,6 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           await sendFAQ(from, phoneNumberId, token);
           await save(conv, 'AWAITING_FAQ');
           break;
-        case 'MENU_EXPERT':
-          await sendText(from,
-            `💬 *Hamare Expert Se Baat Karein*\n\n` +
-            `📞 Call: +91-9315576914\n` +
-            `⏰ Available: 9 AM – 9 PM, 7 days\n\n` +
-            `Ya yahan message karein — *15 minutes* mein response guaranteed! 🙏\n\n` +
-            `_Hamare team ka koi bhi sawaal miss nahi karta._ ✅`,
-            phoneNumberId, token
-          );
-          await sendReturnToMenu(from, phoneNumberId, token);
-          break;
         case 'MENU_EXISTING':
           await sendButtons(from,
             `📦 *Existing Booking Manage Karein*\n\n` +
@@ -881,6 +1092,75 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
         default:
           // Unrecognised — re-show welcome menu
           await sendWelcome(from, biz, phoneNumberId, token, true);
+      }
+      break;
+    }
+
+    // ── Deep Cleaning: home size ──────────────────────────────────────────────
+    case 'AWAITING_BHK': {
+      if (text === 'DC_INCLUDED') {
+        await sendIncludedDetails(from, phoneNumberId, token);
+        await sendBhkMenu(from, phoneNumberId, token);
+        break;
+      }
+      const bhk = parseBhk(text);
+      if (!bhk) { await sendBhkMenu(from, phoneNumberId, token); break; }
+
+      let leadId = conv.data.leadId;
+      if (!leadId) {
+        const partial = await Lead.create({
+          name: 'Incomplete', phone: from, serviceInterest: dcLabel(bhk),
+          quotedAmount: DC_PACKAGES[bhk], source: 'whatsapp', stage: 'new',
+          notes: 'WhatsApp bot — Full Home Deep Cleaning enquiry',
+        });
+        leadId = partial._id.toString();
+      }
+      await save(conv, 'AWAITING_DC_EXTRAS', { leadId, dcBhk: bhk, dcExtraBath: 0, dcExtraBalcony: 0 });
+      await sendPackageChosen(from, bhk, phoneNumberId, token);
+      break;
+    }
+
+    // ── Deep Cleaning: any extra bathroom / balcony? ──────────────────────────
+    case 'AWAITING_DC_EXTRAS': {
+      if (text === 'DC_NO_EXTRA') {
+        await goToDcSummary(conv, from, { dcExtraBath: 0, dcExtraBalcony: 0 }, phoneNumberId, token);
+      } else if (text === 'DC_HAS_EXTRA') {
+        await save(conv, 'AWAITING_DC_EXTRA_BATH');
+        await askExtraCount(from, 'bath', phoneNumberId, token);
+      } else if (text === 'DC_CHANGE_SIZE') {
+        await save(conv, 'AWAITING_BHK');
+        await sendBhkMenu(from, phoneNumberId, token);
+      } else {
+        await sendPackageChosen(from, conv.data.dcBhk, phoneNumberId, token);
+      }
+      break;
+    }
+
+    case 'AWAITING_DC_EXTRA_BATH': {
+      const n = parseExtra(text);
+      if (n === null) { await askExtraCount(from, 'bath', phoneNumberId, token); break; }
+      await save(conv, 'AWAITING_DC_EXTRA_BALCONY', { dcExtraBath: n });
+      await askExtraCount(from, 'balcony', phoneNumberId, token);
+      break;
+    }
+
+    case 'AWAITING_DC_EXTRA_BALCONY': {
+      const n = parseExtra(text);
+      if (n === null) { await askExtraCount(from, 'balcony', phoneNumberId, token); break; }
+      await goToDcSummary(conv, from, { dcExtraBalcony: n }, phoneNumberId, token);
+      break;
+    }
+
+    // ── Deep Cleaning: bill → continue to date ───────────────────────────────
+    case 'AWAITING_DC_SUMMARY': {
+      if (text === 'DC_CONTINUE') {
+        await save(conv, 'AWAITING_DATE');
+        await askDate(from, phoneNumberId, token);
+      } else if (text === 'DC_CHANGE_SIZE') {
+        await save(conv, 'AWAITING_BHK');
+        await sendBhkMenu(from, phoneNumberId, token);
+      } else {
+        await sendDcSummary(from, conv.data.selectedServices || [], phoneNumberId, token);
       }
       break;
     }
@@ -1321,7 +1601,10 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
     case 'AWAITING_CONFIRM': {
       if (text === 'CONFIRM_YES' || lowerText === 'confirm' || text === '1') {
         const services       = conv.data.selectedServices || [];
-        const serviceInterest = services.map((s) => s.subService).join(' + ');
+        const isDeep          = isDeepCleaningCart(services);
+        const serviceInterest = isDeep
+          ? services.map((s) => `${s.subService}${s.quantity > 1 ? ` ×${s.quantity}` : ''}`).join(' + ')
+          : services.map((s) => s.subService).join(' + ');
         const totalAmount    = cartTotal(services);
         const serviceNotes   = services.map((s) =>
           `${s.subService}${s.quantity > 1 ? ` ×${s.quantity}` : ''} (₹${s.price})`
@@ -1334,7 +1617,7 @@ const handleIncoming = async ({ from, text, msgType, businessPhone }) => {
           scheduledDate:   conv.data.date,
           timeSlot:        conv.data.timeSlot,
           address:         conv.data.address,
-          notes:           `Services:\n${serviceNotes}`,
+          notes:           `${isDeep ? '🏠 FULL HOME DEEP CLEANING\n' : ''}Services:\n${serviceNotes}`,
           stage:           'new',
         };
 

@@ -22,6 +22,7 @@ const leadRoutes = require('./src/routes/leads');
 const subscriptionRoutes = require('./src/routes/subscriptions');
 const webhookRoutes = require('./src/routes/webhook');
 const inboxRoutes   = require('./src/routes/inbox');
+const settingsRoutes = require('./src/routes/settings');
 
 const app = express();
 
@@ -82,6 +83,12 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// Public images the WhatsApp bot sends by URL (Meta's servers download them)
+app.use('/media', express.static(require('path').join(__dirname, 'public'), {
+  maxAge: '7d',
+  setHeaders: (res) => res.set('Cross-Origin-Resource-Policy', 'cross-origin'),
+}));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'CleanCruisers API is running', timestamp: new Date() });
@@ -99,6 +106,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/webhook/whatsapp', webhookRoutes);
 app.use('/api/inbox', inboxRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

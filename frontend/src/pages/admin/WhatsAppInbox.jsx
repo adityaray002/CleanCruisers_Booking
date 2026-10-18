@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { MessageSquare, Send, Phone, RefreshCw, ChevronLeft, User, Tag, StickyNote, X, Download, Contact } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
-import { inboxAPI } from '../../utils/api';
+import { inboxAPI, settingsAPI } from '../../utils/api';
 import { downloadCallingSheet } from '../../utils/callingSheet';
 import toast from 'react-hot-toast';
 
@@ -37,6 +37,12 @@ const STEP_LABEL = {
   AWAITING_ADDRESS:        'Entering address',
   AWAITING_NAME:           'Entering name',
   AWAITING_CONFIRM:        'Confirming booking',
+  AWAITING_QUICK_ORDER:    'Typing order',
+  AWAITING_BHK:            'Choosing home size',
+  AWAITING_DC_EXTRAS:      'Checking extras',
+  AWAITING_DC_EXTRA_BATH:  'Extra bathrooms',
+  AWAITING_DC_EXTRA_BALCONY: 'Extra balconies',
+  AWAITING_DC_SUMMARY:     'Reviewing package',
   COMPLETED:               'Done ✓',
 };
 
@@ -231,6 +237,63 @@ function ContactsExportModal({ onClose }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Chatbot booking-mode toggle (what "Book Cleaning" shows customers) ─────────
+const BOOKING_MODES = [
+  { key: 'deep_cleaning', label: '🏠 Full Home Deep Cleaning', hint: 'Only BHK packages (1–5 BHK)' },
+  { key: 'classic',       label: '🧹 Regular Services',        hint: 'Sofa, bed, bathroom, pest control…' },
+];
+
+function BookingModeToggle() {
+  const [mode, setMode]     = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    settingsAPI.getBot('sofashine').then((res) => setMode(res.data.data.bookingMode)).catch(() => {});
+  }, []);
+
+  const change = async (next) => {
+    if (next === mode || saving) return;
+    setSaving(true);
+    try {
+      const res = await settingsAPI.updateBot({ businessId: 'sofashine', bookingMode: next });
+      setMode(res.data.data.bookingMode);
+      toast.success(`Chatbot now shows: ${BOOKING_MODES.find((m) => m.key === next).label}`);
+    } catch {
+      // api interceptor already shows the error
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
+      <div className="text-xs text-gray-500 shrink-0">
+        <span className="font-semibold text-gray-800">🤖 Chatbot "Book Cleaning" shows:</span>
+      </div>
+      <div className="flex gap-1.5 flex-wrap">
+        {BOOKING_MODES.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => change(m.key)}
+            disabled={mode === null || saving}
+            title={m.hint}
+            className={`text-xs px-3 py-1.5 rounded-full border transition-colors disabled:opacity-60 ${
+              mode === m.key
+                ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {mode && (
+        <span className="text-xs text-gray-400 sm:ml-auto">{BOOKING_MODES.find((m) => m.key === mode)?.hint}</span>
+      )}
     </div>
   );
 }
@@ -461,7 +524,9 @@ export default function WhatsAppInbox() {
         />
       )}
 
-      <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+      <BookingModeToggle />
+
+      <div className="flex h-[calc(100vh-12rem)] min-h-[420px] bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
 
         {/* ── Left: Conversation list ── */}
         <div className={`w-full md:w-80 border-r border-gray-100 flex flex-col flex-shrink-0 overflow-hidden ${selected ? 'hidden md:flex' : 'flex'}`}>
@@ -613,6 +678,11 @@ export default function WhatsAppInbox() {
                             {c.businessId}
                           </span>
                           {c.chatLabel && <LabelBadge labelKey={c.chatLabel} small />}
+                          {c.lead?.serviceInterest?.startsWith('Deep Cleaning') && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-teal-100 text-teal-700">
+                              🏠 {c.lead.serviceInterest.match(/\d BHK/)?.[0] || 'Deep Clean'}
+                            </span>
+                          )}
                           {c.botStep && c.botStep !== 'COMPLETED' && !c.chatLabel && (
                             <span className="text-xs text-orange-500 truncate">• {STEP_LABEL[c.botStep] || c.botStep}</span>
                           )}

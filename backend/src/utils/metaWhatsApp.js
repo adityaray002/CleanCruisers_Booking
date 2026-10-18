@@ -19,14 +19,24 @@ const sendText = (to, text, phoneNumberId, token) =>
     text: { body: text, preview_url: false },
   });
 
-// Up to 3 quick-reply buttons
-const sendButtons = (to, body, buttons, phoneNumberId, token) =>
+// Image by public URL (Meta downloads it); caption max 1024 chars
+const sendImage = (to, link, caption, phoneNumberId, token) =>
+  post(phoneNumberId, token, {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'image',
+    image: { link, ...(caption && { caption }) },
+  });
+
+// Up to 3 quick-reply buttons, optionally with an image header shown above the text
+const sendButtons = (to, body, buttons, phoneNumberId, token, headerImage = null) =>
   post(phoneNumberId, token, {
     messaging_product: 'whatsapp',
     to,
     type: 'interactive',
     interactive: {
       type: 'button',
+      ...(headerImage && { header: { type: 'image', image: { link: headerImage } } }),
       body: { text: body },
       action: {
         buttons: buttons.map((b) => ({
@@ -50,4 +60,4 @@ const sendList = (to, body, buttonLabel, sections, phoneNumberId, token) =>
     },
   });
 
-module.exports = { sendText, sendButtons, sendList };
+module.exports = { sendText, sendImage, sendButtons, sendList };

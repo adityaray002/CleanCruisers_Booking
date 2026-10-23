@@ -558,9 +558,9 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     `━━━━━━━━━━━━━━━━━━\n` +
     `🪑 *SOFA EXTRAS*\n` +
     `_Cushions, table, accessories ki cleaning_\n` +
-    `• ottoman  →  ₹80 / piece\n` +
+    `• ottoman  →  ₹100 / piece\n` +
     `• table    →  ₹150 / table\n` +
-    `• cushion  →  ₹20 / cover\n\n` +
+    `• cushion  →  ₹30 / cover\n\n` +
 
 
      `━━━━━━━━━━━━━━━━━━\n` +
@@ -582,7 +582,7 @@ const sendMasterPriceCard = async (to, phoneNumberId, token) => {
     `━━━━━━━━━━━━━━━━━━\n` +
     `🚿 *BATHROOM CLEANING*\n` +
     `_Tiles + grout + fixtures + complete sanitize_\n` +
-    `• per bathroom  →  ₹350\n\n` +
+    `• per bathroom  →  ₹450\n\n` +
 
     `━━━━━━━━━━━━━━━━━━\n` +
     `🪑 *CHAIRS & ITEMS*\n` +

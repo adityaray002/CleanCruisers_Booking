@@ -205,7 +205,7 @@ const UPSELL = {
 
 // ── Full Home Deep Cleaning (BHK packages, from SofaShine_Full_Home_Deep_Cleaning.pdf) ──
 const DC_SERVICE     = 'Deep Cleaning';
-const DC_PACKAGES    = { 1: 2800, 2: 3500, 3: 4500, 4: 5700, 5: 7000 }; // each BHK includes N bedrooms, bathrooms, balconies
+const DC_PACKAGES    = { 1: 3800, 2: 4500, 3: 5500, 4: 6700, 5: 8000 }; // each BHK includes N bedrooms, bathrooms, balconies
 // Files live in backend/public/bot. Bump the version after replacing a file so Meta re-downloads it.
 const DC_IMAGE_VERSION = 1;
 const DC_IMG = {
